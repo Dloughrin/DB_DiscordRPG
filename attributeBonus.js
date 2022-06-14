@@ -214,12 +214,48 @@ class AttributeBonus {
         return str;
 	}
 
+	outputBonusArray() {
+		let n = new Array();
+        if(this.bstr != 0) n.push(["Str",(this.bstr*100).toFixed(2).toLocaleString(undefined)]);
+        if(this.bdex != 0) n.push(["Dex",(this.bdex*100).toFixed(2).toLocaleString(undefined)]);
+        if(this.bcon != 0) n.push(["Con",(this.bcon*100).toFixed(2).toLocaleString(undefined)]);
+        if(this.beng != 0) n.push(["Eng",(this.beng*100).toFixed(2).toLocaleString(undefined)]);
+        if(this.bsol != 0) n.push(["Sol",(this.bsol*100).toFixed(2).toLocaleString(undefined)]);
+        if(this.bfoc != 0) n.push(["Foc",(this.bfoc*100).toFixed(2).toLocaleString(undefined)]);
+
+	    if(this.chargeBonus != 0) n.push(["Charge Bonus",(this.chargeBonus*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.charge != 0) n.push(["Charge",(this.charge*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.health != 0) n.push(["Health",(this.health*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.energy != 0) n.push(["Energy",(this.energy*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.healthRegen != 0) n.push(["Health Regen",(this.healthRegen*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.energyRegen != 0) n.push(["Energy Regen",(this.energyRegen*100).toFixed(2).toLocaleString(undefined)]);
+
+	    if(this.hit != 0) n.push(["Hit Rate",(this.hit*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.dodge != 0) n.push(["Dodge",(this.dodge*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.speed != 0) n.push(["Speed",(this.speed*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.critRate != 0) n.push(["Crit Rate",(this.critRate*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.critDamage != 0) n.push(["Crit Damage",(this.critDamage*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.blockRate != 0) n.push(["Block Rate",(this.blockRate*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.blockPower != 0) n.push(["Block Power",(this.blockPower*100).toFixed(2).toLocaleString(undefined)]);
+
+	    if(this.pDefense != 0) n.push(["Physical Defense",(this.pDefense*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.eDefense != 0) n.push(["Energy Defense",(this.eDefense*100).toFixed(2).toLocaleString(undefined)]);
+
+	    if(this.magicPower != 0) n.push(["Magic Power",(this.magicPower*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.magicDefense != 0) n.push(["Magic Defense",(this.magicDefense*100).toFixed(2).toLocaleString(undefined)]);
+
+	    if(this.physicalAttack != 0) n.push(["Physical Attack",(this.physicalAttack*100).toFixed(2).toLocaleString(undefined)]);
+	    if(this.energyAttack != 0) n.push(["Energy Attack",(this.energyAttack*100).toFixed(2).toLocaleString(undefined)]);
+
+        return n;
+	}
+
 	getTotalChange() {
 		let total = this.bstr + this.bdex + this.bcon + this.beng + this.bsol + this.bfoc + this.chargeBonus + this.health;
 		total += this.energy + this.healthRegen + this.energyRegen + this.charge + this.hit + this.dodge;
 		total += this.speed + this.critRate + this.critDamage + this.blockRate + this.blockPower + this.pDefense;
 		total += this.eDefense + this.magicPower + this.magicDefense + this.physicalAttack + this.energyAttack;
-		return (100*total);
+		return Math.round(100*total);
 	}
 
 	calcAffixCost(str,typeNum) {
@@ -730,8 +766,8 @@ class AttributeBonus {
 			this.magicPower = 1.5;
 			this.magicDefense = 0.5;
 	      
-	        this.physicalAttack = 0;
-	        this.energyAttack = 0;
+	        this.physicalAttack = -0.25;
+	        this.energyAttack = -0.2;
 		}
 		else {
 			this.bstr = 0;
@@ -741,7 +777,7 @@ class AttributeBonus {
 			this.bsol = 0;
 			this.bfoc = 0;
 
-	        this.chargeBonus = 0;
+	        this.chargeBonus = 0.1;
 
 			this.health = 0.1;
 			this.energy = 0.1;

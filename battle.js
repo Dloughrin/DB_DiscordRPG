@@ -13,6 +13,7 @@ class Battle {
       this.expMod = 1;
       this.deathChance = 0;
       this.zeniRisk = 0;
+      this.itemBox = "None";
 
       this.pCombatants = new Array();
       for(let i = 0; i < players.length; i++) {
@@ -149,26 +150,43 @@ class Battle {
       choices.push(["Transform",Number(personality[3])]); //transform
       choices.push(["Strike Tech",Number(personality[4])]); //strike technique
       choices.push(["Ki Tech",Number(personality[5])]); //ki technique
+      choices.push(["Buff",Number(personality[6])]); //buff technique
+      choices.push(["Debuff",Number(personality[7])]); //debuff technique
+      choices.push(["Restoration",Number(personality[8])]); //healing technique
 
       let phys = npc.battleCurrAtt.physicalAttack - target.battleCurrAtt.pDefense;
       let energy = npc.battleCurrAtt.energyAttack - target.battleCurrAtt.eDefense;
 
       if(phys > energy) {
-        choices[0][1] += 2;
-        choices[1][1] -= 1;
+        if(npc.battleCurrAtt.physicalAttack > npc.battleCurrAtt.energyAttack) {
+          choices[1][1] -= 3;
+          choices[4][1] += 2;
+        }
+        else {
+          choices[0][1] -= 1;
+          choices[5][1] += 2;
+        }
         choices[4][1] += 2;
         choices[5][1] -= 1;
+        choices[8][1] -= 2;
       }
       else {
-        choices[0][1] -= 1;
-        choices[1][1] += 2;
+        if(npc.battleCurrAtt.physicalAttack < npc.battleCurrAtt.energyAttack) {
+          choices[0][1] -= 3;
+          choices[5][1] += 2;
+        }
+        else {
+          choices[0][1] -= 1;
+          choices[4][1] += 2;
+        }
         choices[4][1] -= 1;
         choices[5][1] += 2;
+        choices[8][1] += 1;
       }
 
-      if(npc.battleCurrAtt.speed > target.battleCurrAtt.speed*3) {
-        choices[0][1] += Math.round(npc.battleCurrAtt.speed/target.battleCurrAtt.speed/3);
-        choices[1][1] += Math.round(npc.battleCurrAtt.speed/target.battleCurrAtt.speed/3);
+      if(npc.battleCurrAtt.speed > target.battleCurrAtt.speed*3.5) {
+        choices[0][1] += Math.round(npc.battleCurrAtt.speed/target.battleCurrAtt.speed);
+        choices[1][1] += Math.round(npc.battleCurrAtt.speed/target.battleCurrAtt.speed);
       }
 
       if(npc.battleCurrAtt.charge === npc.battleMaxAtt.charge) {
@@ -189,17 +207,25 @@ class Battle {
         choices[3][1] -= 2;
         choices[4][1] -= 2;
         choices[5][1] -= 2;
+        choices[6][1] -= 2;
+        choices[7][1] -= 2;
       }
       if(npc.battleCurrAtt.health <= npc.battleMaxAtt.health*0.2) {
         choices[3][1] -= 3;
+        choices[8][1] += 3;
       }
+
 
       if(npc.transformation === -1 || npc.isTransformed != -1) {
         choices[3][1] -= 100;
       }
-      else if(npc.transformation != -1 && npc.battleCurrAtt.energy < 3 * npc.battleMaxAtt.energy * (this.techList[npc.transformation].energyCost/100)) {
-        choices[3][1] -= 100;
+      else {
+        choices[3][1] += 2*Math.round(this.techList[npc.transformation].attBonus.getTotalChange()/100);
       }
+      if(npc.transformation !== -1 && npc.battleCurrAtt.health < 0.5 * npc.battleMaxAtt.health && npc.battleCurrAtt.energy < 3 * npc.battleMaxAtt.energy * (this.techList[npc.transformation].energyCost/100)) {
+        if(npc.transformation === -1 || npc.isTransformed != -1) choices[3][1] += 102;
+        else choices[3][1] -= 100;
+      } 
       if(npc.battleCurrAtt.health <= npc.battleMaxAtt.health*0.8) {
         choices[3][1] += 2;
       }
@@ -216,12 +242,29 @@ class Battle {
         choices[3][1] += 2;
         choices[2][1] += 1;
       }
+      else if(npc.battleCurrAtt.stotal*npc.level > 1.4*target.battleCurrAtt.stotal*target.level*target.battleCurrAtt.chargeBonus) {
+        choices[3][1] -= 4;
+        choices[2][1] -= 2;
+      }
+
+
+      if(npc.race.raceName === "Human" || npc.race.raceName === "Majin" || npc.race.raceName === "Dragon_Clan") {
+        choices[7][1] += 1;
+        choices[8][1] += 1;
+      }
+      else if(npc.race.raceName === "Saiyan" || npc.race.raceName === "Android") {
+        choices[7][1] -= 100;
+        choices[8][1] -= 100;
+      }
 
       let chosenTech = null;
       let scaler = Math.round((npc.level+npc.battleCurrAtt.stotal)/2);
       if(npc.techniques.length === 0) {
         choices[4][1] -= 100;
         choices[5][1] -= 100;
+        choices[6][1] -= 100;
+        choices[7][1] -= 100;
+        choices[8][1] -= 100;
       }
       else {
         for(let i = 0; i < npc.techniques.length; i++) {
@@ -234,13 +277,13 @@ class Battle {
             techPref[i][1] += Number(choices[4][1]);
           }
           else if(this.techList[techPref[i][0]].techType === "Buff") {
-            techPref[i][1] += 4;
+            techPref[i][1] += Number(choices[6][1]);
           }
           else if(this.techList[techPref[i][0]].techType === "Debuff") {
-            techPref[i][1] += 3;
+            techPref[i][1] += Number(choices[7][1]);
           }
           else if(this.techList[techPref[i][0]].techType === "Restoration") {
-            techPref[i][1] += 2;
+            techPref[i][1] += Number(choices[8][1]);
 
             if(npc.battleCurrAtt.energy < npc.battleMaxAtt.energy*0.25 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 4;
             else if(npc.battleCurrAtt.energy < npc.battleMaxAtt.energy*0.5 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 2;
@@ -254,19 +297,28 @@ class Battle {
           }
           else if(this.techList[techPref[i][0]].techType === "Ki" || this.techList[techPref[i][0]].techType === "Strike") {
             techPref[i][1] += Math.round(Number(this.techList[techPref[i][0]].scalePercent));
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].flatDamage/30);
+            techPref[i][1] += Math.round(this.techList[techPref[i][0]].flatDamage/40);
             techPref[i][1] -= Math.round(this.techList[techPref[i][0]].energyCost/75);
             techPref[i][1] -= Math.round(this.techList[techPref[i][0]].healthCost/50);
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].hitRate/50);
+            techPref[i][1] += Math.round(this.techList[techPref[i][0]].hitRate/25);
             techPref[i][1] += Math.round(this.techList[techPref[i][0]].critRate/10);
             techPref[i][1] += Math.round(this.techList[techPref[i][0]].armorPen/10);
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].allowCharge);
+            techPref[i][1] += Math.round(this.techList[techPref[i][0]].hits/2);
+            if(this.techList[techPref[i][0]].allowCharge > 0) techPref[i][1] += 1;
           }
           else if(this.techList[techPref[i][0]].techType === "Buff" || this.techList[techPref[i][0]].techType === "Debuff") {
             techPref[i][1] -= Math.round(this.techList[techPref[i][0]].energyCost/50);
             techPref[i][1] -= Math.round(this.techList[techPref[i][0]].healthCost/25);
-            if(this.techList[techPref[i][0]].techType === "Buff") techPref[i][1] += Math.round(this.techList[techPref[i][0]].attBonus.getTotalChange()/5);
-            else techPref[i][1] -= Math.round(this.techList[techPref[i][0]].attBonus.getTotalChange()/10);
+            if(this.techList[techPref[i][0]].techType === "Buff") techPref[i][1] += 2*Math.round(this.techList[techPref[i][0]].attBonus.getTotalChange()/100);
+            else {
+              techPref[i][1] += Math.round(this.techList[techPref[i][0]].attBonus.getTotalChange()/100);
+            }
+          }
+          else if(this.techList[techPref[i][0]].techType === "Restoration") {
+            techPref[i][1] += Math.round(Number(this.techList[techPref[i][0]].scalePercent));
+            techPref[i][1] += Math.round(this.techList[techPref[i][0]].flatDamage/30);
+            techPref[i][1] -= Math.round(this.techList[techPref[i][0]].energyCost/75);
+            techPref[i][1] -= Math.round(this.techList[techPref[i][0]].healthCost/50);
           }
           else {
             techPref[i][1] += Number(this.techList[techPref[i][0]].scalePercent);
@@ -293,6 +345,9 @@ class Battle {
       if(chosenTech === null) {
         choices[4][1] -= 100;
         choices[5][1] -= 100;
+        choices[6][1] -= 100;
+        choices[7][1] -= 100;
+        choices[8][1] -= 100;
       }
 
       choices.sort(function(a,b) {return b[1] - a[1]});
@@ -687,7 +742,7 @@ class Battle {
         
         //calculate base heal
         let restore;
-        restore = attacker.battleCurrAtt.magicPower*attacker.battleCurrAtt.chargeBonus;
+        restore = attacker.battleCurrAtt.magicPower*attacker.battleCurrAtt.chargeBonus*technique.scalePercent;
         restore += Math.round(technique.flatDamage*scaleLvl*attacker.battleCurrAtt.chargeBonus);
      
         //check for critical

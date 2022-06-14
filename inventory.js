@@ -21,11 +21,13 @@ class Inventory {
 	}
 
 	removeItem(id) {
+		id = id-1;
 		if(id < 0 || id >= this.items.length) {
 			return 0;
 		}
 		else {
-			this.items.splice((id-1),1);
+			console.log(this.items[id].name);
+			this.items.splice(id,1);
 			return 1;
 		}
 	}

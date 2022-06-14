@@ -48,6 +48,7 @@ class Technique {
         this.flatDamage = 0;
         this.allowCharge = 0;
         this.attBonus = new AttributeBonus(this.name,this.techType);
+        this.coolDown = 0;
       }
       else if(type == "Buff") {
         this.name = name;
@@ -93,9 +94,9 @@ class Technique {
         this.hitRate = 0;
         this.critRate = 0;
         this.health = 0;
-        this.allowCharge = 0;
         this.energy = 0;
         this.coolDown = 0;
+        this.allowCharge = 0;
       }
     }
   

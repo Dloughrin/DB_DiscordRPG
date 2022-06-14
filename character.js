@@ -16,7 +16,7 @@ class Character {
     this.playerID = player;
     this.image = '';
     this.personalityName = "None";
-    this.personality = [1,1,1,2,2,2];
+    this.personality = [1,1,1,2,2,2,1,1,1];
 
     this.deathCount = 0;
     this.hasZenkai = null;
@@ -43,6 +43,7 @@ class Character {
     this.weapon = null;
     this.styleName = "No_Style";
     this.fightingStyle = new AttributeBonus(this.styleName,"Fighting Style");
+    this.techModify = 0;
 
     /**********
     ***********
@@ -64,41 +65,41 @@ class Character {
 
   setPersonality(personalityType) {
     if(this.race.raceName === "Android" || this.race.raceName === "Majin") personalityType = this.race.raceName;
-    //[strike,burst,charge,transform,strike tech,ki tech]
+    //[strike,burst,charge,transform,strike tech,ki tech,buff,debuff,restoration]
     if(personalityType === "Striker") {
-      this.personality = [2,1,1,2,2,1];
+      this.personality = [2,1,1,2,2,1,1,0,0];
       this.personalityName = "Striker";
     }
     else if(personalityType === "Android") {
-      this.personality = [0,0,0,2,3,3];
+      this.personality = [0,0,0,2,3,3,2,2,3];
       this.personalityName = "Android";
     }
     else if(personalityType === "Majin") {
-      this.personality = [2,2,2,1,1,1];
+      this.personality = [2,2,2,1,0,0,1,1,2];
       this.personalityName = "Majin";
     }
     else if(personalityType === "Blaster") {
-      this.personality = [1,2,1,2,1,2];
+      this.personality = [1,2,1,2,1,2,0,0,1];
       this.personalityName = "Blaster";
     }
     else if(personalityType === "Tank") {
-      this.personality = [2,0,1,2,2,2];
+      this.personality = [2,-1,2,2,1,1,2,1,1];
       this.personalityName = "Tank";
     }
     else if(personalityType === "eTank") {
-      this.personality = [0,2,1,2,2,2];
+      this.personality = [-1,2,3,2,1,2,0,2,3];
       this.personalityName = "Tank";
     }
     else if(personalityType === "AllOut") {
-      this.personality = [0,0,1,4,3,3];
+      this.personality = [-1,-1,0,4,3,3,-1,-1,-2];
       this.personalityName = "AllOut";
     }
     else if(personalityType === "HoldBack") {
-      this.personality = [1,1,2,2,3,3];
+      this.personality = [3,3,1,1,2,2,-2,-2,-4];
       this.personalityName = "HoldBack";
     }
     else {
-      this.personality = [1,1,1,2,2,2];
+      this.personality = [1,1,1,2,2,2,1,1,1];
       this.personalityName = "None";
     }
   }
@@ -304,7 +305,6 @@ class Character {
         this.battleMaxAtt.buffDurations.push(-1);
         this.addBuff(this.weapon.attbonus,-1);
       }
-
       if(this.fightingStyle.getTotalChange() > 0) {
         this.addBuff(this.fightingStyle, -1);
       }

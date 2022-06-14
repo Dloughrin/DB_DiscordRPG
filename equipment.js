@@ -52,7 +52,7 @@ class Equipment {
 		else return 1;
 	}
 
-	getAffixCost(str) {
+	getQual() {
 		let qual = 0;		
 		if(this.quality === "Standard") {
 			qual = 0;
@@ -72,6 +72,12 @@ class Equipment {
 		else if(this.quality === "Divine") {
 			qual = 5;
 		}
+
+		return qual;
+	}
+
+	getAffixCost(str) {
+		let qual = this.getQual();
 
 		return this.attbonus.calcAffixCost(str,qual);
 	}
@@ -84,25 +90,7 @@ class Equipment {
 	addAffix(affType) {
 		if(this.addedAffixes >= this.maxAddedAffix) return -1;
 
-		let qual = 0;		
-		if(this.quality === "Standard") {
-			qual = 0;
-		} 
-		else if(this.quality === "High"){ 
-			qual = 1;
-		}
-		else if(this.quality === "Epic") {
-			qual = 2;
-		}
-		else if(this.quality === "Legendary") {
-			qual = 3;
-		}
-		else if(this.quality === "Mythic") {
-			qual = 4;
-		}
-		else if(this.quality === "Divine") {
-			qual = 5;
-		}
+		let qual = this.getQual();
 		if(this.attbonus.ifZero(affType,qual)) {
 			this.attbonus.itemSocketed(qual);
 			this.addedAffixes++;

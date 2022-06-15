@@ -145,7 +145,7 @@ class Naming {
 		let attr = new AttributeBonus(name,"Weapon");
 		let weapon = this.weaponAffix(type,attr);
 
-		let a = Math.round(Math.random()*this.lengths.length-1);
+		let a = Math.round(Math.random()*(this.lengths.length-1));
 		if(a<0) a = 0;
 		else if(a>=this.lengths.length) a = this.lengths.length-1;
 		let affixes = this.lengths[a];
@@ -212,7 +212,7 @@ class Naming {
 		let attr = new AttributeBonus(name,"Dogi");
 		let armor = this.armorAffix(type,attr);
 
-		let a = Math.round(Math.random()*this.lengths.length-1);
+		let a = Math.round(Math.random()*(this.lengths.length-1));
 		if(a<0) a = 0;
 		else if(a>=this.lengths.length) a = lengths.length-1;
 		let affixes = this.lengths[a];

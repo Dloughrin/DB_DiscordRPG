@@ -10,7 +10,7 @@ const Technique = tech.Technique;
 
 class Character {
 	constructor(name,race,attr,player) {
-    console.log('New Character: ' + name + ', Race - ' + race.raceName);
+    //console.log('New Character: ' + name + ', Race - ' + race.raceName);
 		this.name = name;
 		this.race = race;
     this.playerID = player;
@@ -44,6 +44,7 @@ class Character {
     this.styleName = "No_Style";
     this.fightingStyle = new AttributeBonus(this.styleName,"Fighting Style");
     this.techModify = 0;
+    this.styleModify = 0;
 
     /**********
     ***********
@@ -62,6 +63,66 @@ class Character {
                                           this.battleMaxAtt.sol, this.battleMaxAtt.foc);
     this.statusUpdate(0);
 	}
+
+  clone() {
+    let char = new Character(this.name,this.race,new Attributes(0,0,0,0,0,0),this.playerID);
+    char.image = this.image;
+    char.personalityName = this.personalityName;
+    char.personality = this.personality;
+
+    char.deathCount = this.deathCount;
+    char.hasZenkai = this.hasZenkai;
+    char.transformation = this.transformation;
+    char.isTransformed = this.isTransformed;
+    char.scaled = this.scaled;
+
+    char.techniques = new Array(); 
+    char.techCooldowns = new Array();
+
+    for(let i = 0; i < this.techniques.length; i++) {
+      char.techniques.push(this.techniques[i]);
+    } 
+    for(let i = 0; i < this.techCooldowns.length; i++) {
+      char.techCooldowns.push(this.techCooldowns[i]);
+    } 
+
+    char.techniquePoints = this.techniquePoints;
+    char.statPoints = this.statPoints;
+    char.level = this.level;
+    char.exp = this.exp;
+    char.totalexp = this.totalexp;
+    char.nextEXP = this.nextEXP;
+
+    /**********
+    Equipment
+    **********/
+
+    char.dogi = this.dogi;
+    char.weapon = this.weapon;
+    char.styleName = this.styleName;
+    char.fightingStyle = this.fightingStyle;
+    char.techModify = this.techModify;
+
+    /**********
+    ***********
+    **********/
+
+    char.target = this.target = 0;
+    char.isCharging = this.isCharging = 0;
+
+    char.attributes = new Attributes(this.attributes.str, this.attributes.dex,
+                                       this.attributes.con, this.attributes.eng,
+                                       this.attributes.sol, this.attributes.foc);
+    char.bonusAtt = new Attributes(0,0,0,0,0,0);
+    char.battleMaxAtt = new Attributes(char.attributes.str, char.attributes.dex,
+                                       char.attributes.con, char.attributes.eng,
+                                       char.attributes.sol, char.attributes.foc);
+    char.battleCurrAtt = new Attributes(char.battleMaxAtt.str, char.battleMaxAtt.dex,
+                                      char.battleMaxAtt.con, char.battleMaxAtt.eng,
+                                      char.battleMaxAtt.sol, char.battleMaxAtt.foc);
+    char.statusUpdate(0);
+    return char;
+  }
 
   setPersonality(personalityType) {
     if(this.race.raceName === "Android" || this.race.raceName === "Majin") personalityType = this.race.raceName;

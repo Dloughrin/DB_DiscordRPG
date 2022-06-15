@@ -132,7 +132,6 @@ class Battle {
             this.NPCactions.push(action);
           }
           else if(this.NPCombatants.length > (this.NPCactions.length + deadI)) {
-            console.log(this.NPCombatants.length + " >= " + (this.NPCactions.length + deadI));
             return 0;
           }
         }
@@ -491,7 +490,7 @@ class Battle {
       let hit = Math.round(Math.random() * 100) + 1;
       let block = Math.round(Math.random() * 100) + 1;
       let damR = Math.random() * 0.2 + 0.9;
-      let calcHit = this.dodgeCalc(1.1*attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus, target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus);
+      let calcHit = this.dodgeCalc(1.2*attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus, target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus);
       
       if(hit >= calcHit) {
         str = str + '\n' + (attacker.name.replace(/\_/g,' ') + ' missed!')
@@ -539,7 +538,7 @@ class Battle {
       let hit = Math.round(Math.random() * 100) + 1;
       let block = Math.round(Math.random() * 100) + 1;
       let damR = Math.random() * 0.2 + 0.9;
-      let calcHit = this.dodgeCalc(1.05*attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus, target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus);
+      let calcHit = this.dodgeCalc(1.15*attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus, target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus);
       
       //check for dodge, return 0
       if(hit >= calcHit) {
@@ -754,8 +753,8 @@ class Battle {
         target.battleCurrAtt.health += Math.round(technique.health*restore);
         target.battleCurrAtt.energy += Math.round(technique.energy*restore);
 
-        if(technique.health*restore > 0) str = str + '\n' + Math.round(technique.health*restore) + ' health restored!';
-        if(technique.energy*restore > 0) str = str + '\n' + Math.round(technique.energy*restore) + ' energy restored!';
+        if(technique.health*restore > 0) str = str + '\n' + Math.round(technique.health*restore).toLocaleString(undefined) + ' health restored!';
+        if(technique.energy*restore > 0) str = str + '\n' + Math.round(technique.energy*restore).toLocaleString(undefined) + ' energy restored!';
         return [0,str];
       }
     }

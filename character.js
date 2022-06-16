@@ -35,6 +35,9 @@ class Character {
 		this.nextEXP = 1;
     this.nextLevel(this.level);
 
+    this.party = null;
+    this.earnedEXP = 0;
+
     /**********
     Equipment
     **********/
@@ -47,7 +50,7 @@ class Character {
     this.styleModify = 0;
 
     /**********
-    ***********
+    Battle
     **********/
 
     this.target = 0;
@@ -92,6 +95,8 @@ class Character {
     char.exp = this.exp;
     char.totalexp = this.totalexp;
     char.nextEXP = this.nextEXP;
+
+    char.party = this.party;
 
     /**********
     Equipment
@@ -268,9 +273,10 @@ class Character {
 	}
   
 	addEXP(num) {
-    let str = null;
+    let str = "";
 		this.exp += num;
     this.totalexp += num;
+    let count = 0;
 		while(this.exp >= this.nextEXP) {
 			this.exp -= this.nextEXP;
 			this.level += 1;
@@ -301,7 +307,9 @@ class Character {
 
       this.statusUpdate(0);
       
-      str = ('\nLEVEL UP');
+      count++;
+      if(count > 1) str = ('\n' + this.name + " has leveled up " + count + " times!");
+      else str = ('\n' + this.name + " has leveled up!");
 		}
     return str;
 	}

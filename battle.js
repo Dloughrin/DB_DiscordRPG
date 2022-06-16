@@ -14,6 +14,7 @@ class Battle {
       this.deathChance = 0;
       this.zeniRisk = 0;
       this.itemBox = "None";
+      this.raid = 0;
 
       this.pCombatants = new Array();
       for(let i = 0; i < players.length; i++) {

@@ -27,6 +27,7 @@ class Races {
 		else if(raceName === "Namekian") this.raceListBonuses = (this.setUpRace(2,1,3,2,1,2,"Namekian"));
 		else if(raceName === "Dragon_Clan") this.raceListBonuses = (this.setUpRace(1,1,1,4,2,2,"Dragon_Clan"));
 		else if(raceName === "Arconian") this.raceListBonuses = (this.setUpRace(1,3,1,3,1,2,"Arcosian"));
+		else if(raceName === "Legendary_Super_Saiyan") this.raceListBonuses = (this.setUpRace(3,2,3,3,2,3,"Legendary_Super_Saiyan"));
 		else {
 			this.raceName = "Alien";
 			this.raceListBonuses = (this.setUpRace(1,1,3,3,1,2,"Alien"));
@@ -102,6 +103,14 @@ class Races {
 			this.beng = 0.3;
 			this.bsol = 0.1;
 			this.bfoc = 0.1;
+		}
+		else if(name === "Legendary_Super_Saiyan") {
+			this.bstr = 0.25;
+			this.bdex = 0.1;
+			this.bcon = 0.1;
+			this.beng = 0.1;
+			this.bsol = 0.1;
+			this.bfoc = 0.25;
 		}
 		else {
 			this.bstr = 0.1;

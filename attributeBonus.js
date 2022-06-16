@@ -769,6 +769,39 @@ class AttributeBonus {
 	        this.physicalAttack = -0.25;
 	        this.energyAttack = -0.2;
 		}
+		else if(name === "Legendary_Super_Saiyan") {
+			this.bstr = 0;
+			this.bdex = 0;
+			this.bcon = 0;
+			this.beng = 0;
+			this.bsol = 0;
+			this.bfoc = 0;
+
+	        this.chargeBonus = 0.15;
+
+			this.health = 0;
+			this.energy = 0;
+			this.healthRegen = -3;
+			this.energyRegen = -1.1;
+			this.charge = 0.15;
+
+			this.hit = 0;
+			this.dodge = 0;
+			this.speed = 0.1;
+	        this.critRate = 0.15;
+	        this.critDamage = 0.25;
+			this.blockRate = 0;
+			this.blockPower = 0;
+
+			this.pDefense = 0.1;
+			this.eDefense = 0.1;
+
+			this.magicPower = -1;
+			this.magicDefense = -0.25;
+	      
+	        this.physicalAttack = 0;
+	        this.energyAttack = 0;
+		}
 		else {
 			this.bstr = 0;
 			this.bdex = 0;

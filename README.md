@@ -32,3 +32,6 @@ Scripted battle scenarios involving the strongest enemies for the game. This is 
 
 ## technique.js
 A basic container class to hold information for all skills in the game. 
+
+## help.js
+Keeps track of all messages and tops the help command will send, as well as the tutorial messages for new accounts.

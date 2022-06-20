@@ -4,14 +4,16 @@ const AttributeBonus = attbonus.AttributeBonus;
 
 class Races {
 	constructor(raceName) {
+		if(raceName === 7) raceName = Math.floor(Math.random() * 9)
+
 		if(raceName === 0 && !isNaN(raceName)) raceName = "Human";
 		else if(raceName === 1 && !isNaN(raceName)) raceName = "Saiyan";
 		else if(raceName === 2 && !isNaN(raceName)) raceName = "Half-Saiyan";
 		else if(raceName === 3 && !isNaN(raceName)) raceName = "Android";
-		else if(raceName === 4 && !isNaN(raceName)) raceName = "Majin";
+		else if(raceName === 7 && !isNaN(raceName)) raceName = "Majin";
 		else if(raceName === 5 && !isNaN(raceName)) raceName = "Namekian";
 		else if(raceName === 6 && !isNaN(raceName)) raceName = "Dragon_Clan";
-		else if(raceName === 7 && !isNaN(raceName)) raceName = "Arcosian";
+		else if(raceName === 4 && !isNaN(raceName)) raceName = "Arcosian";
 		else if(!isNaN(raceName)) raceName = "Alien";
 
 		if(raceName === "Half-saiyan") raceName = "Half-Saiyan";
@@ -26,7 +28,7 @@ class Races {
 		else if(raceName === "Majin") this.raceListBonuses = (this.setUpRace(1,1,4,2,2,1,"Majin"));
 		else if(raceName === "Namekian") this.raceListBonuses = (this.setUpRace(2,1,3,2,1,2,"Namekian"));
 		else if(raceName === "Dragon_Clan") this.raceListBonuses = (this.setUpRace(1,1,1,4,2,2,"Dragon_Clan"));
-		else if(raceName === "Arconian") this.raceListBonuses = (this.setUpRace(1,3,1,3,1,2,"Arcosian"));
+		else if(raceName === "Arcosian") this.raceListBonuses = (this.setUpRace(1,3,1,3,1,2,"Arcosian"));
 		else if(raceName === "Legendary_Super_Saiyan") this.raceListBonuses = (this.setUpRace(3,2,3,3,2,3,"Legendary_Super_Saiyan"));
 		else {
 			this.raceName = "Alien";
@@ -73,12 +75,12 @@ class Races {
 			this.bfoc = 0.1;
 		}
 		else if(name === "Android") {
-			this.bstr = 0.2;
+			this.bstr = 0.1;
 			this.bdex = 0.2;
 			this.bcon = 0.2;
 			this.beng = -0.2;
-			this.bsol = 0;
-			this.bfoc = 0;
+			this.bsol = 0.05;
+			this.bfoc = 0.05;
 		}
 		else if(name === "Majin") {
 			this.bstr = 0;

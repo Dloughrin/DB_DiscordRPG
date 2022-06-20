@@ -228,7 +228,7 @@ class Character {
   }
 
   removeTechnique(id0) {
-    if(this.techniques.length > 0) {
+    if(this.techniques.length > 0 && techniques.length !== 1) {
       this.techniques.splice(id0,1);
       this.techCooldowns.splice(id0,1);
       return "Removed technique."
@@ -274,6 +274,7 @@ class Character {
   
 	addEXP(num) {
     let str = "";
+    if(isNaN(num)) num = 1;
 		this.exp += num;
     this.totalexp += num;
     let count = 0;
@@ -283,7 +284,7 @@ class Character {
 
 			this.nextLevel(this.level);
 
-      let statPInc = 5*(1+Math.floor(this.attributes.stotal / 150));
+      let statPInc = 5*(1+Math.floor(this.attributes.stotal / 75));
       let attBoostInc = 50*(1+Math.floor(this.attributes.stotal / 300));
 
       if(this.level % 2 === 0) this.techniquePoints += 1;
@@ -335,7 +336,7 @@ class Character {
   statusUpdate(chargeStart) {
       if(chargeStart === null) chargeStart = 0;
       this.attributes.calculate(this.level);
-      this.attributes.stotal = this.attributes.str + this.attributes.dex + this.attributes.con + this.attributes.eng + this.attributes.sol + this.attributes.foc;
+      this.attributes.stotal = this.attributes.str + this.attributes.dex + this.attributes.con + this.attributes.eng + this.attributes.sol + this.attributes.foc + 1;
       this.calculateBonusAtt();
 
       this.battleMaxAtt = new Attributes(this.attributes.str, this.attributes.dex,
@@ -349,7 +350,7 @@ class Character {
         this.battleMaxAtt.sol += this.bonusAtt.sol;
         this.battleMaxAtt.foc += this.bonusAtt.foc;
       }
-      this.battleMaxAtt.stotal = this.battleMaxAtt.str + this.battleMaxAtt.dex + this.battleMaxAtt.con + this.battleMaxAtt.eng + this.battleMaxAtt.sol + this.battleMaxAtt.foc;
+      this.battleMaxAtt.stotal = this.battleMaxAtt.str + this.battleMaxAtt.dex + this.battleMaxAtt.con + this.battleMaxAtt.eng + this.battleMaxAtt.sol + this.battleMaxAtt.foc + 1;
       this.battleMaxAtt.buffs.push(this.race.raceListBonuses);
       this.battleMaxAtt.buffDurations.push(-1);
       this.battleMaxAtt.calculate(this.level);
@@ -405,7 +406,7 @@ class Character {
     this.battleCurrAtt.eng += Math.round(this.battleMaxAtt.eng*buff.beng);
     this.battleCurrAtt.sol += Math.round(this.battleMaxAtt.sol*buff.bsol);
     this.battleCurrAtt.foc += Math.round(this.battleMaxAtt.foc*buff.bfoc);
-    this.battleCurrAtt.stotal = this.battleCurrAtt.str + this.battleCurrAtt.dex + this.battleCurrAtt.con + this.battleCurrAtt.eng + this.battleCurrAtt.sol + this.battleCurrAtt.foc;
+    this.battleCurrAtt.stotal = this.battleCurrAtt.str + this.battleCurrAtt.dex + this.battleCurrAtt.con + this.battleCurrAtt.eng + this.battleCurrAtt.sol + this.battleCurrAtt.foc + 1;
 
     this.battleCurrAtt.health = Math.round(this.battleCurrAtt.health*(1+buff.health));
     this.battleCurrAtt.energy = Math.round(this.battleCurrAtt.energy*(1+buff.energy));
@@ -432,7 +433,7 @@ class Character {
     this.battleCurrAtt.eng -= Math.round(this.battleMaxAtt.eng*buff.beng);
     this.battleCurrAtt.sol -= Math.round(this.battleMaxAtt.sol*buff.bsol);
     this.battleCurrAtt.foc -= Math.round(this.battleMaxAtt.foc*buff.bfoc);
-    this.battleCurrAtt.stotal = this.battleCurrAtt.str + this.battleCurrAtt.dex + this.battleCurrAtt.con + this.battleCurrAtt.eng + this.battleCurrAtt.sol + this.battleCurrAtt.foc;
+    this.battleCurrAtt.stotal = this.battleCurrAtt.str + this.battleCurrAtt.dex + this.battleCurrAtt.con + this.battleCurrAtt.eng + this.battleCurrAtt.sol + this.battleCurrAtt.foc + 1;
 
     this.battleCurrAtt.health = Math.round(this.battleCurrAtt.health*(1-buff.health));
     this.battleCurrAtt.energy = Math.round(this.battleCurrAtt.energy*(1-buff.energy));

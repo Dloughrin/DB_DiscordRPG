@@ -536,7 +536,7 @@ class AttributeBonus {
 			this.magicDefense = 0.15;
 	      
 	        this.physicalAttack = 0;
-	        this.energyAttack = 0;
+	        this.energyAttack = 0.1;
 		}
 		else if(name === "Human") {
 			this.bstr = 0;
@@ -592,7 +592,7 @@ class AttributeBonus {
 			this.speed = 0;
 	        this.critRate = 0;
 	        this.critDamage = 0.15;
-			this.blockRate = 0;
+			this.blockRate = 0.1;
 			this.blockPower = 0;
 
 			this.pDefense = 0;
@@ -614,7 +614,7 @@ class AttributeBonus {
 
 	        this.chargeBonus = 0.1;
 
-			this.health = 0;
+			this.health = -0.05;
 			this.energy = 0;
 			this.healthRegen = 0;
 			this.energyRegen = 0.1;
@@ -625,7 +625,7 @@ class AttributeBonus {
 			this.speed = 0;
 	        this.critRate = 0;
 	        this.critDamage = 0;
-			this.blockRate = 0;
+			this.blockRate = 0.1;
 			this.blockPower = 0;
 
 			this.pDefense = 0;
@@ -648,7 +648,7 @@ class AttributeBonus {
 	        this.chargeBonus = 0;
 
 			this.health = 0;
-			this.energy = -0.7;
+			this.energy = -0.6;
 			this.healthRegen = 0;
 			this.energyRegen = 0;
 			this.charge = 0;

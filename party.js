@@ -34,7 +34,7 @@ class Party {
 
 	addEXP(charList, char, xp) { 
 		for(let i = 0; i < this.partyList.length; i++) {
-			if(this.partyList[i].name !== char.name && this.partyList[i].playerID !== char.playerID) {
+			if(this.partyList[i].name !== char.name || this.partyList[i].playerID !== char.playerID) {
 				let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(this.partyList[i].playerID+this.partyList[i].name);
 	      if(z !== -1) charList[z].addEXP(Math.round(xp*this.expShare));
 			}

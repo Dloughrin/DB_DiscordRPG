@@ -26,7 +26,6 @@ class Inventory {
 			return 0;
 		}
 		else {
-			console.log(this.items[id].name);
 			this.items.splice(id,1);
 			return 1;
 		}

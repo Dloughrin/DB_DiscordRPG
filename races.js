@@ -3,6 +3,7 @@ const attbonus = require("./attributeBonus.js");
 const AttributeBonus = attbonus.AttributeBonus;
 
 class Races {
+	static max = 150;
 	constructor(raceName) {
 		if(raceName === 7) raceName = Math.floor(Math.random() * 9)
 
@@ -21,6 +22,7 @@ class Races {
 
 		this.raceName = raceName;
 
+		//Primal Majin, Core People (kaioshin), Bio Android, Fused (Racename)
 		if(raceName === "Human") this.raceListBonuses = (this.setUpRace(2,2,2,2,2,2,"Human"));
 		else if(raceName === "Saiyan") this.raceListBonuses = (this.setUpRace(1,3,1,2,1,3,"Saiyan"));
 		else if(raceName === "Half-Saiyan") this.raceListBonuses = (this.setUpRace(2,3,1,2,1,2,"Half-Saiyan"));
@@ -34,7 +36,16 @@ class Races {
 			this.raceName = "Alien";
 			this.raceListBonuses = (this.setUpRace(1,1,3,3,1,2,"Alien"));
 		}
+
+
+		this.maxStr = Races.max+Races.max*this.bstr*2;
+		this.maxDex = Races.max+Races.max*this.bdex*2;
+		this.maxCon = Races.max+Races.max*this.bcon*2;
+		this.maxEng = Races.max+Races.max*this.beng*2;
+		this.maxSol = Races.max+Races.max*this.bsol*2;
+		this.maxFoc = Races.max+Races.max*this.bfoc*2;
 	}
+
 	setUpRace(s, d, c, e, so, f, name) {
 		this.str = s;
 		this.dex = d;

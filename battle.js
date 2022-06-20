@@ -157,43 +157,27 @@ class Battle {
       choices.push(["Debuff",Number(personality[7])]); //debuff technique
       choices.push(["Restoration",Number(personality[8])]); //healing technique
 
-      let phys = npc.battleCurrAtt.physicalAttack - target.battleCurrAtt.pDefense;
-      let energy = npc.battleCurrAtt.energyAttack - target.battleCurrAtt.eDefense;
+      let phys = this.defenseCalc(npc.battleCurrAtt.physicalAttack, target.battleCurrAtt.pDefense);
+      let energy = this.defenseCalc(npc.battleCurrAtt.energyAttack, target.battleCurrAtt.eDefense);
 
       if(phys > energy) {
-        if(npc.battleCurrAtt.physicalAttack > npc.battleCurrAtt.energyAttack) {
-          choices[1][1] -= 3;
-          choices[4][1] += 2;
-        }
-        else {
-          choices[0][1] -= 1;
-          choices[5][1] += 2;
-        }
-        choices[0][1] += 1;
-        choices[1][1] -= 1;
+        choices[0][1] += 2;
+        choices[1][1] -= 4;
         choices[4][1] += 2;
-        choices[5][1] -= 1;
+        choices[5][1] -= 4;
         choices[8][1] -= 2;
       }
       else {
-        if(npc.battleCurrAtt.physicalAttack < npc.battleCurrAtt.energyAttack) {
-          choices[0][1] -= 3;
-          choices[5][1] += 2;
-        }
-        else {
-          choices[0][1] -= 1;
-          choices[4][1] += 2;
-        }
-        choices[0][1] -= 1;
-        choices[1][1] += 1;
-        choices[4][1] -= 1;
+        choices[0][1] -= 4;
+        choices[1][1] += 2;
+        choices[4][1] -= 4;
         choices[5][1] += 2;
-        choices[8][1] += 1;
+        choices[8][1] += 2;
       }
 
-      if(npc.battleCurrAtt.speed > target.battleCurrAtt.speed*3.5) {
-        choices[0][1] += Math.round(npc.battleCurrAtt.speed/target.battleCurrAtt.speed);
-        choices[1][1] += Math.round(npc.battleCurrAtt.speed/target.battleCurrAtt.speed);
+      if(npc.battleCurrAtt.speed > target.battleCurrAtt.speed*2) {
+        choices[0][1] += 1+Math.round(npc.battleCurrAtt.speed/target.battleCurrAtt.speed);
+        choices[1][1] += 1+Math.round(npc.battleCurrAtt.speed/target.battleCurrAtt.speed);
       }
 
       if(npc.battleCurrAtt.charge === npc.battleMaxAtt.charge) {

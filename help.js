@@ -92,7 +92,7 @@ class Help {
 				return ["npcspar [NPC name]","Start a safe battle with an NPC."]
 			}
 			else if(topic === "suppress") {
-				return ["suppress [optional: percent reduction]","Adds a buff that reduces all stats outside CON and ENG to match either the enemy or an arbitrary percent given."]
+				return ["suppress [optional: percent reduction]","Adds a buff that reduces all stats outside CON and ENG to match either the enemy or to an arbitrary percent given."]
 			}
 			else if(topic === "forfeit") {
 				return ["forfeit","Gives up the current battle. If you're in a non safe battle, you have a high chance of death."]

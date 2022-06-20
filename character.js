@@ -38,6 +38,9 @@ class Character {
     this.party = null;
     this.earnedEXP = 0;
 
+    this.potentialUnlocked = 0;
+    this.potentialUnleashed = 0;
+
     /**********
     Equipment
     **********/
@@ -228,7 +231,7 @@ class Character {
   }
 
   removeTechnique(id0) {
-    if(this.techniques.length > 0 && techniques.length !== 1) {
+    if(this.techniques.length > 0 && this.techniques.length !== 1) {
       this.techniques.splice(id0,1);
       this.techCooldowns.splice(id0,1);
       return "Removed technique."
@@ -289,6 +292,15 @@ class Character {
 
       if(this.level % 2 === 0) this.techniquePoints += 1;
       if(this.level % statPInc === 0) this.statPoints += 1;
+
+      if(this.level % 2 === 0 && this.level >= 300) this.techniquePoints += 2;
+      if(this.level % 2 === 0 && this.level >= 600) this.techniquePoints += 3;
+      if(this.level % statPInc === 0 && this.level >= 400) this.statPoints += 2;
+      if(this.level % statPInc === 0 && this.level >= 800) this.statPoints += 2;
+
+      if(this.level % 2 === 0 && this.potentialUnlocked === 1) this.techniquePoints += 1;
+      if(this.level % statPInc === 0 && this.potentialUnlocked === 1) this.statPoints += 1;
+
       if(this.level % attBoostInc === 0) {
         this.attributes.str += this.race.str;
         this.attributes.dex += this.race.dex;

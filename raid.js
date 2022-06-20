@@ -57,6 +57,12 @@ class Raid {
 
 	scaleStats() { }
 
+	//potential unlocked: epic box reward for first time, as well as the tag to double stat/technique point gain. small 'zenkai'-like boost
+	namekianTrial() { }
+
+	//potential unleashed: mythic box reward for first time, as well as the tag to gain potential unleashed passive (10% all stats + 50% of racial bonus)
+	kaioshinTrial() { }
+
 	broly(npcList, techList, party) { 
 		let attr = new Attributes(65,45,60,55,85,100);
       	let broly = new Character("Broly",new Races("Legendary_Super_Saiyan"),attr,"NPC");

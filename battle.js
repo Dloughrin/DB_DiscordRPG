@@ -278,9 +278,11 @@ class Battle {
 
             if(npc.battleCurrAtt.energy < npc.battleMaxAtt.energy*0.25 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 4;
             else if(npc.battleCurrAtt.energy < npc.battleMaxAtt.energy*0.5 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 2;
+            else if(this.techList[techPref[i][0]].energy != 0) techPref[i][1] -= 6;
 
             if(npc.battleCurrAtt.health < npc.battleMaxAtt.health*0.25 && this.techList[techPref[i][0]].health != 0) techPref[i][1] += 5;
             else if(npc.battleCurrAtt.health < npc.battleMaxAtt.health*0.5 && this.techList[techPref[i][0]].health != 0) techPref[i][1] += 2;
+            else if(this.techList[techPref[i][0]].health != 0) techPref[i][1] -= 6;
           }
 
           if(this.techList[techPref[i][0]].energyCost*scaler*2 >= npc.battleCurrAtt.energy || this.techList[techPref[i][0]].healthCost*scaler*3 >= npc.battleCurrAtt.health) {
@@ -499,7 +501,7 @@ class Battle {
         return [0,str];
       }
       
-      let damage = attacker.battleCurrAtt.physicalAttack*1.3*attacker.battleCurrAtt.chargeBonus;
+      let damage = attacker.battleCurrAtt.physicalAttack*0.8*attacker.battleCurrAtt.chargeBonus;
       //let r = this.defenseCalc(attacker.level, attacker.battleCurrAtt.stotal, target.battleCurrAtt.pDefense*target.battleCurrAtt.chargeBonus);
       damage = this.defenseCalc(damage, target.battleCurrAtt.pDefense*target.battleCurrAtt.chargeBonus);
       //damage = Math.round(damage * (1 + r[0]));
@@ -509,7 +511,7 @@ class Battle {
       //if(r[1] > damage*0.85) r[1] = damage*0.85;
       //damage = damage-r[1];
       
-      let s = Math.round((1.3 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.7 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+      let s = Math.round((1.4 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.7 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
       
       if(s < 2) {
         s = 2;
@@ -522,7 +524,7 @@ class Battle {
       let blockPow = 0;
       if(block <= (target.battleCurrAtt.blockRate - adjustment)) {
         str = str + '\n' + (target.name.replace(/\_/g,' ') + ' blocked!');
-        blockPow = target.battleCurrAtt.blockPower*target.battleCurrAtt.chargeBonus/Battle.blockModifier;
+        blockPow = 0.8*target.battleCurrAtt.blockPower*target.battleCurrAtt.chargeBonus/Battle.blockModifier;
         damage = this.defenseCalc(damage,blockPow);
       }
       
@@ -561,7 +563,7 @@ class Battle {
       }
       
       //calculate base damage
-      let damage = attacker.battleCurrAtt.energyAttack*0.9*attacker.battleCurrAtt.chargeBonus;
+      let damage = attacker.battleCurrAtt.energyAttack*0.5*attacker.battleCurrAtt.chargeBonus;
       //let r = this.defenseCalc(attacker.level, attacker.battleCurrAtt.stotal, target.battleCurrAtt.eDefense*target.battleCurrAtt.chargeBonus);
       damage = this.defenseCalc(damage, target.battleCurrAtt.eDefense*target.battleCurrAtt.chargeBonus);
       damage *= 2;

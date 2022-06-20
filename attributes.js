@@ -48,19 +48,19 @@ class Attributes {
 		this.healthRegen = Math.round((1 + ((this.con*2+2)*level)/8)*this.btotal.healthRegen);
 		this.energyRegen = Math.round((1 + ((this.eng*2+(this.sol/2)+1)*level)/8)*this.btotal.energyRegen);
 
-		this.hit = Math.round(((1.5*level + 10 +(this.dex*0.25)+(this.foc)))*this.btotal.hit);
-		this.dodge = Math.round(((level + 5 + (this.dex*0.75)+(this.foc*0.25)))*this.btotal.dodge);
+		this.hit = Math.round((0.5*level + 10 +(this.dex*0.25)+(this.foc)+0.05*(this.str+this.sol))*this.btotal.hit);
+		this.dodge = Math.round(((0.33*level + 5 + (this.dex*0.75)+(this.foc*0.3)))*this.btotal.dodge);
     this.critRate = Math.min(70,Math.round((5 + (this.dex/10 + this.foc/15))*(this.btotal.critRate)));
     this.critDamage = (1.25 + (this.str * (1/10) + this.dex * (1/20) + this.foc * (2/10) + this.sol * (1/10))/100)*this.btotal.critDamage;
 		this.blockRate = (5 + (this.dex/8 + this.str/7))*this.btotal.blockRate;
-		this.blockPower = Math.round((20 + ((this.con/2)+(this.str*1.5)+this.sol))*this.btotal.blockPower);
+		this.blockPower = Math.round((100 + ((this.con/2)+(this.str*1.5)+this.sol))*this.btotal.blockPower);
 		this.speed = Math.round((10 + (this.dex+(0.75*this.foc)+10)*level)*this.btotal.speed);
 
-		this.pDefense = Math.round((1 + (this.con*2+this.str*(2/3)+this.foc*(1/6)+this.dex*(1/6)+2+this.sol*(1/10)))*this.btotal.pDefense);
-		this.eDefense = Math.round((1 + (this.eng*2+this.sol*(2/3)+this.foc*(1/3)+2+this.str*(1/10)))*this.btotal.eDefense);
+		this.pDefense = Math.round((25 + (this.con*2+this.str*(2/3)+this.foc*(1/6)+this.dex*(1/6)+2+this.sol*(1/10)))*this.btotal.pDefense);
+		this.eDefense = Math.round((25 + (this.eng*2+this.sol*(2/3)+this.foc*(1/3)+2+this.str*(1/10)))*this.btotal.eDefense);
 
 		this.magicPower = Math.round(((0 + (this.sol+(this.foc*2)+(this.eng/2)+1)*level) / 10)*this.btotal.magicPower);
-		this.magicDefense = Math.round(((0 + (this.sol+2)*level) / 3)*this.btotal.magicDefense);
+		this.magicDefense = Math.round(((10 + (this.sol+2)*level) / 3)*this.btotal.magicDefense);
         
     this.physicalAttack = 30 + Math.round(((3 + this.str*2 + this.dex*0.5) * level / 2)*this.btotal.physicalAttack);
     this.energyAttack = 25 + Math.round(((1 + this.sol*2 + this.foc*0.4) * level / 2)*this.btotal.energyAttack);

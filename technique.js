@@ -65,6 +65,8 @@ class Technique {
         this.allowCharge = 0;
         this.duration = hits;
         this.attBonus = new AttributeBonus(this.name,this.techType);
+        
+        this.guardTarget = 0;
       }
       else if(type == "Debuff") {
         this.name = name;

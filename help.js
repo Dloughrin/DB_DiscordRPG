@@ -15,7 +15,8 @@ class Help {
 		"sellitem", "givezeni", "shop", 
 		"affixitem", "utech", "ctech", 
 		"settrans", "rtrans", "settech", 
-		"removetech", "swaptech", "style"
+		"removetech", "swaptech", "style",
+		"enemybuffs", "battlebuffs"
 	];
 
 	//list of valid topics for the help command -> selectbox
@@ -32,6 +33,12 @@ class Help {
 		if(choice === "commands") {
 			if(topic === "help") {
 				return ["help","This command opens the help menu."]
+			}
+			else if(topic === "enemybuffs") {
+				return ["enemybuffs","Displays the buff list for every enemy while in battle."]
+			}
+			else if(topic === "battlebuffs") {
+				return ["battlebuffs","Displays the buff list for every ally while in battle."]
 			}
 			else if(topic === "ping") {
 				return ["ping","Zeno returns a pong to check latency."]

@@ -21,6 +21,7 @@ class Battle {
 
       this.pCombatants = new Array();
       for(let i = 0; i < players.length; i++) {
+        console.log(players[i].name)
         this.pCombatants.push(players[i]);
       }
       this.NPCombatants = new Array();
@@ -112,12 +113,68 @@ class Battle {
       this.coolDownTick();
 
       let deadI = 0;
+      console.log(this.pCombatants.length)
       for(let i = 0; i < this.pCombatants.length; i++) {
-        if(this.pCombatants[i].battleCurrAtt.health <= 0) {
+        if(this.pCombatants[i].playerID === "NPC" || this.pCombatants[i].playerID === "Random" ) {
+          let target = -1;
+          let targets = new Array();
+          for(let z = 0; z < this.NPCombatants.length; z++) {
+            targets.push([z,this.NPCombatants[z].battleCurrAtt.con+this.NPCombatants[z].battleCurrAtt.eng/2+this.NPCombatants[z].battleCurrAtt.stotal/15+this.NPCombatants[z].level/20]);
+          }
+          targets.sort(function(a,b) {return b[1] - a[1]});
+          let ind = 0;
+          while(target === -1) {
+            target = targets[ind][0];
+            if(this.NPCombatants[target].battleCurrAtt.health <= 0) {
+              target = -1;
+              ind++;
+            }
+          }
+          this.pCombatants[i].eTarget = target;
+
+          target = -1;
+          targets = new Array();
+          for(let z = 0; z < this.pCombatants.length; z++) {
+            let priority = 5*this.pCombatants[z].battleMaxAtt.health/(1+this.pCombatants[z].battleCurrAtt.health) + this.pCombatants[z].battleMaxAtt.energy/(1+this.pCombatants[z].battleCurrAtt.energy);
+            priority *= (this.pCombatants[z].battleCurrAtt.stotal+this.pCombatants[z].level)/2;
+            if(this.pCombatants[i].name+this.pCombatants[i].playerID === this.pCombatants[z].name+this.pCombatants[z].playerID) priority = priority*0.75;
+            targets.push([z,priority]);
+          }
+          targets.sort(function(a,b) {return b[1] - a[1]});
+          ind = 0;
+          while(target === -1) {
+            target = targets[ind][0];
+            if(this.pCombatants[target].battleCurrAtt.health <= 0) {
+              target = -1;
+              ind++;
+            }
+          }
+          this.pCombatants[i].aTarget = target;
+
+          let aiChoice = this.AI(this.pCombatants[i].personality, this.pCombatants[i],this.NPCombatants[this.pCombatants[i].eTarget],this.pCombatants[this.pCombatants[i].aTarget]);
+          let action = aiChoice[1];
+          action.push(i);
+          if(aiChoice[0] === 'e') {
+            action.push(this.pCombatants[i].eTarget);
+          }
+          else if(aiChoice[0] === 'a') {
+            action.push(-3);
+          }
+          else {
+            action.push(aiChoice[0]);
+          }
+
+          this.actions.push(action);
+        }
+        else if(this.pCombatants[i].battleCurrAtt.health <= 0) {
           deadI++;
         }
+        else if(this.pCombatants.length <= (this.actions.length + deadI)) {
+          return 0;
+        }
       }
-
+/********************************************************************************/
+console.log(this.actions.length + deadI)
       if(this.pCombatants.length <= (this.actions.length + deadI)) {
         deadI = 0;
         for(let i = 0; i < this.NPCombatants.length; i++) {
@@ -126,16 +183,56 @@ class Battle {
           }
           else if(this.NPCombatants[i].playerID === "NPC" || this.NPCombatants[i].playerID === "Random" ) {
             let target = -1;
-            while(target === -1) {
-              target = Math.round(Math.random() * (this.pCombatants.length-1));
-              if(this.pCombatants[target].battleCurrAtt.health <= 0) target = -1;
+            let targets = new Array();
+            for(let z = 0; z < this.pCombatants.length; z++) {
+              targets.push([z,this.pCombatants[z].battleCurrAtt.con+this.pCombatants[z].battleCurrAtt.eng/2+this.pCombatants[z].battleCurrAtt.stotal/15+this.pCombatants[z].level/20]);
             }
-            let action = this.AI(this.NPCombatants[i].personality, this.NPCombatants[i],this.pCombatants[target]);
+            targets.sort(function(a,b) {return b[1] - a[1]});
+            let ind = 0;
+            while(target === -1) {
+              target = targets[ind][0];
+              if(this.pCombatants[target].battleCurrAtt.health <= 0) {
+                target = -1;
+                ind++;
+              }
+            }
+            this.NPCombatants[i].eTarget = target;
+
+            target = -1;
+            targets = new Array();
+            for(let z = 0; z < this.NPCombatants.length; z++) {
+              let priority = 5*this.NPCombatants[z].battleMaxAtt.health/(1+this.NPCombatants[z].battleCurrAtt.health) + this.NPCombatants[z].battleMaxAtt.energy/(1+this.NPCombatants[z].battleCurrAtt.energy);
+              priority *= (this.NPCombatants[z].battleCurrAtt.stotal+this.NPCombatants[z].level)/2;
+              if(this.NPCombatants[i].name+this.NPCombatants[i].playerID === this.NPCombatants[z].name+this.NPCombatants[z].playerID) priority = priority*0.66;
+              targets.push([z,priority]);
+            }
+            targets.sort(function(a,b) {return b[1] - a[1]});
+            ind = 0;
+            while(target === -1) {
+              target = targets[ind][0];
+              if(this.NPCombatants[target].battleCurrAtt.health <= 0) {
+                target = -1;
+                ind++;
+              }
+            }
+            this.NPCombatants[i].aTarget = target;
+
+            let aiChoice = this.AI(this.NPCombatants[i].personality, this.NPCombatants[i],this.pCombatants[this.NPCombatants[i].eTarget],this.NPCombatants[this.NPCombatants[i].aTarget]);
+            let action = aiChoice[1];
             action.push(i);
-            action.push(target);
+            if(aiChoice[0] === 'e') {
+              action.push(this.NPCombatants[i].eTarget);
+            }
+            else if(aiChoice[0] === 'a') {
+              action.push(-3);
+            }
+            else {
+              action.push(aiChoice[0]);
+            }
+
             this.NPCactions.push(action);
           }
-          else if(this.NPCombatants.length > (this.NPCactions.length + deadI)) {
+          else if(this.NPCombatants.length <= (this.NPCactions.length + deadI)) {
             return 0;
           }
         }
@@ -144,7 +241,7 @@ class Battle {
       return 0;
     }
 
-    AI(personality, npc, target) {
+    AI(personality, npc, target, ally) {
       let choices = new Array();
       let techPref = new Array();
       choices.push(["Strike",Number(personality[0])]); //strike
@@ -240,8 +337,9 @@ class Battle {
 
 
       if(npc.race.raceName === "Human" || npc.race.raceName === "Majin" || npc.race.raceName === "Dragon_Clan") {
-        choices[7][1] += 1;
-        choices[8][1] += 1;
+        choices[6][1] += 1;
+        choices[7][1] += 2;
+        choices[8][1] += 2;
       }
       else if(npc.race.raceName === "Saiyan" || npc.race.raceName === "Android") {
         choices[7][1] -= 100;
@@ -269,6 +367,7 @@ class Battle {
           }
           else if(this.techList[techPref[i][0]].techType === "Buff") {
             techPref[i][1] += Number(choices[6][1]);
+            if(ally.battleCurrAtt.stotal > npc.battleCurrAtt.stotal * 1.5) techPref[i][1] += 3;
           }
           else if(this.techList[techPref[i][0]].techType === "Debuff") {
             techPref[i][1] += Number(choices[7][1]);
@@ -276,13 +375,16 @@ class Battle {
           else if(this.techList[techPref[i][0]].techType === "Restoration") {
             techPref[i][1] += Number(choices[8][1]);
 
-            if(npc.battleCurrAtt.energy < npc.battleMaxAtt.energy*0.25 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 4;
-            else if(npc.battleCurrAtt.energy < npc.battleMaxAtt.energy*0.5 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 2;
-            else if(this.techList[techPref[i][0]].energy != 0) techPref[i][1] -= 6;
+            if(ally.battleCurrAtt.energy < ally.battleMaxAtt.energy*0.25 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 4;
+            else if(ally.battleCurrAtt.energy < ally.battleMaxAtt.energy*0.5 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 2;
+            else if(ally.battleCurrAtt.energy < ally.battleMaxAtt.energy*0.66 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 1;
+            else techPref[i][1] -= 4;
+            if(this.techList[techPref[i][0]].energy != 0) techPref[i][1] -= 6;
 
-            if(npc.battleCurrAtt.health < npc.battleMaxAtt.health*0.25 && this.techList[techPref[i][0]].health != 0) techPref[i][1] += 5;
-            else if(npc.battleCurrAtt.health < npc.battleMaxAtt.health*0.5 && this.techList[techPref[i][0]].health != 0) techPref[i][1] += 2;
-            else if(this.techList[techPref[i][0]].health != 0) techPref[i][1] -= 6;
+            if(ally.battleCurrAtt.health < ally.battleMaxAtt.health*0.25 && this.techList[techPref[i][0]].health != 0) techPref[i][1] += 5;
+            else if(ally.battleCurrAtt.health < ally.battleMaxAtt.health*0.5 && this.techList[techPref[i][0]].health != 0) techPref[i][1] += 2;
+            else techPref[i][1] -= 4;
+            if(this.techList[techPref[i][0]].health != 0) techPref[i][1] -= 6;
           }
 
           if(this.techList[techPref[i][0]].energyCost*scaler*2 >= npc.battleCurrAtt.energy || this.techList[techPref[i][0]].healthCost*scaler*3 >= npc.battleCurrAtt.health) {
@@ -302,7 +404,26 @@ class Battle {
           else if(this.techList[techPref[i][0]].techType === "Buff" || this.techList[techPref[i][0]].techType === "Debuff") {
             techPref[i][1] -= Math.round(this.techList[techPref[i][0]].energyCost/50);
             techPref[i][1] -= Math.round(this.techList[techPref[i][0]].healthCost/25);
-            if(this.techList[techPref[i][0]].techType === "Buff") techPref[i][1] += 2*Math.round(this.techList[techPref[i][0]].attBonus.getTotalChange()/100);
+            if(this.techList[techPref[i][0]].techType === "Buff") {
+              if(ally.name+ally.playerID === npc.name+npc.playerID) {
+                techPref[i][1] -= this.techList[techPref[i][0]].guardTarget * 500;
+              }
+              else if(ally.guarded === -1 && npc.guarding === -1) {
+                techPref[i][1] += this.techList[techPref[i][0]].guardTarget * 10;
+                choices[6][1] += this.techList[techPref[i][0]].guardTarget * 10;
+              }
+              else if(ally.guarded !== -1 && ally.battleCurrAtt.health < ally.battleMaxAtt.health*0.5) {
+                techPref[i][1] += this.techList[techPref[i][0]].guardTarget * 12;
+                choices[6][1] += this.techList[techPref[i][0]].guardTarget * 12;
+              }
+
+              if(npc.battleCurrAtt.health < npc.battleMaxAtt.health*0.33) {
+                techPref[i][1] -= this.techList[techPref[i][0]].guardTarget * 10;
+                choices[6][1] -= this.techList[techPref[i][0]].guardTarget * 10;
+              }
+
+              techPref[i][1] += Math.round(2.5*this.techList[techPref[i][0]].attBonus.getTotalChange()/100);
+            }
             else {
               techPref[i][1] += Math.round(this.techList[techPref[i][0]].attBonus.getTotalChange()/100);
             }
@@ -347,24 +468,23 @@ class Battle {
       let choice = choices[0][0];
 
       if(choice === "Strike") {
-        return this.strike(npc,target);
+        return ['e', this.strike(npc,target)];
       }
       else if(choice === "Burst") {
-        return this.burst(npc,target);
+        return ['e', this.burst(npc,target)];
       }
       else if(choice === "Charge") {
-        return this.charge(npc);
+        return [-1, this.charge(npc)];
       }
       else if(choice === "Transform") {
-        return this.transform(npc);
+        return [-2, this.transform(npc)];
       }
       else {
         npc.techCooldowns[techPref[0][2]] = this.techList[chosenTech].coolDown;
-        let t;
-        if(this.techList[chosenTech].techType === "Buff" || this.techList[chosenTech].techType === "Restoration") t = npc;
-        else t = target;
-        if(npc.battleCurrAtt.charge > (npc.battleMaxAtt.charge * 0.2 * this.techList[chosenTech].allowCharge) && npc.battleCurrAtt.charge > 0) return this.skill(npc, t, this.techList[chosenTech], 1);
-        else return this.skill(npc, t, this.techList[chosenTech], 0);
+        if(this.techList[chosenTech].techType === "Buff" || this.techList[chosenTech].techType === "Restoration") {
+          return ['a', this.skill(npc, ally, this.techList[chosenTech], 0)];
+        }
+        else return ['e', this.skill(npc, target, this.techList[chosenTech], 0)];
         
       }
     }
@@ -394,9 +514,19 @@ class Battle {
             this.pCombatants[this.actions[i][2]].statRegen();
             this.pCombatants[this.actions[i][2]].statRegen();
           }
-          else {
+          else if(this.actions[i][3] !== -3) {
             this.pCombatants[this.actions[i][2]].statRegen();
-            this.NPCombatants[this.actions[i][3]].takeDamage(this.actions[i][0]);
+            if(this.NPCombatants[this.actions[i][3]].guarded === -1) this.NPCombatants[this.actions[i][3]].takeDamage(this.actions[i][0]);
+            else {
+              let guardDam = Math.round(this.actions[i][0]*0.15);
+              let damReduct = Math.round(this.actions[i][0]*0.25).toLocaleString(undefined);
+              this.actions[i][0] = this.actions[i][0]*0.75;
+              let index = this.NPCombatants.map(function(e) { return e.name+e.playerID; }).indexOf(this.NPCombatants[this.actions[i][3]].guarded);
+              this.NPCombatants[this.actions[i][3]].takeDamage(this.actions[i][0]);
+              this.NPCombatants[index].takeDamage(guardDam);
+              this.actions[i][1] = this.actions[i][1] + "\nBut" + this.pCombatants[this.actions[i][2]].name.replace(/\_/g,' ') + "'s attack has been guarded, and the damage was reduced by " + damReduct + "!"
+              this.actions[i][1] = this.actions[i][1] + "\n" + this.NPCombatants[index].name.replace(/\_/g,' ') + " takes " + guardDam.toLocaleString(undefined) + " of the damage."
+            }
 
             if(this.NPCombatants[this.actions[i][3]].battleCurrAtt.health <= 0) {
               this.actions[i][1] = this.actions[i][1] + "\n" + this.NPCombatants[this.actions[i][3]].name.replace(/\_/g,' ') + " has been defeated by ";
@@ -430,16 +560,25 @@ class Battle {
             this.NPCombatants[this.NPCactions[i][2]].statRegen();
             this.NPCombatants[this.NPCactions[i][2]].statRegen();
           }
-          else {
+          else if(this.NPCactions[i][3] !== -3) {
             this.NPCombatants[this.NPCactions[i][2]].statRegen();
-            this.pCombatants[this.NPCactions[i][3]].takeDamage(this.NPCactions[i][0]);
+            if(this.pCombatants[this.NPCactions[i][3]].guarded === -1) this.pCombatants[this.NPCactions[i][3]].takeDamage(this.NPCactions[i][0]);
+            else {
+              let guardDam = Math.round(this.NPCactions[i][0]*0.15);
+              let damReduct = Math.round(this.NPCactions[i][0]*0.25).toLocaleString(undefined);
+              this.NPCactions[i][0] = Math.round(this.NPCactions[i][0]*0.75);
+              let index = this.pCombatants.map(function(e) { return e.name+e.playerID; }).indexOf(this.pCombatants[this.NPCactions[i][3]].guarded);
+              this.pCombatants[this.NPCactions[i][3]].takeDamage(this.NPCactions[i][0]);
+              this.pCombatants[index].takeDamage(guardDam);
+              this.NPCactions[i][1] = this.NPCactions[i][1] + "\nBut " + this.NPCombatants[this.NPCactions[i][2]].name.replace(/\_/g,' ') + "'s attack has been guarded, and the damage was reduced by " + damReduct + "!"
+              this.NPCactions[i][1] = this.NPCactions[i][1] + "\n" + this.pCombatants[index].name.replace(/\_/g,' ') + " takes " + guardDam.toLocaleString(undefined) + " of the damage."
+            }
 
             if(this.pCombatants[this.NPCactions[i][3]].battleCurrAtt.health <= 0) {
               this.NPCactions[i][1] = this.NPCactions[i][1] + "\n" + this.pCombatants[this.NPCactions[i][3]].name.replace(/\_/g,' ') + " has been defeated by ";
               this.NPCactions[i][1] = this.NPCactions[i][1] + this.NPCombatants[this.NPCactions[i][2]].name.replace(/\_/g,' ') + "!";
             }
           }
-
         }
       }
     }
@@ -709,6 +848,34 @@ class Battle {
         }
 
         str = str + (attacker.name.replace(/\_/g,' ') + ' uses ' + technique.name.replace(/\_/g,' ') + ' on ' + target.name.replace(/\_/g,' ') + '!');
+        if(technique.guardTarget !== 0) {
+          if(target.name+target.playerID === attacker.name+attacker.playerID) {
+            str = str + "\n" + attacker.name.replace(/\_/g,' ') + " can't guard themselves!";
+          }
+          else if(target.name+target.playerID === attacker.guarding) {
+            str = str + "\n" + attacker.name.replace(/\_/g,' ') + " is no longer guarding " + target.name.replace(/\_/g,' ') + "!";
+            attacker.guarding = -1;
+            target.guarded = -1;
+          }
+          else {
+            let index = this.NPCombatants.map(function(e) { return e.guarded; }).indexOf(attacker.name+attacker.playerID);
+            if(index !== -1) {
+              str = str + "\n" + attacker.name.replace(/\_/g,' ') + " is no longer guarding " + this.NPCombatants[index].name.replace(/\_/g,' ') + "!";
+              this.NPCombatants[index].guarded = -1;
+            }
+            else index = this.pCombatants.map(function(e) { return e.guarded; }).indexOf(attacker.name+attacker.playerID);
+
+            if(index !== -1) {
+              str = str + "\n" + attacker.name.replace(/\_/g,' ') + " is no longer guarding " + this.pCombatants[index].name.replace(/\_/g,' ') + "!";
+              this.pCombatants[index].guarded = -1;
+            }
+
+            str = str + "\n" + attacker.name.replace(/\_/g,' ') + " guards " + target.name.replace(/\_/g,' ') + "!";
+            attacker.guarding = target.name+target.playerID;
+            target.guarded = attacker.name+attacker.playerID;
+
+          }
+        }
         
         attacker.battleCurrAtt.health -= technique.healthCost*scaleLvl;
         attacker.battleCurrAtt.energy -= technique.energyCost*scaleLvl;

@@ -56,8 +56,11 @@ class Character {
     Battle
     **********/
 
-    this.target = 0;
+    this.eTarget = 0;
+    this.aTarget = 0;
     this.isCharging = 0;
+    this.guarded = -1;
+    this.guarding = -1;
 
 		this.attributes = attr;
     this.bonusAtt = new Attributes(0,0,0,0,0,0);
@@ -100,6 +103,8 @@ class Character {
     char.nextEXP = this.nextEXP;
 
     char.party = this.party;
+    char.potentialUnlocked = this.potentialUnlocked;
+    char.potentialUnleashed = this.potentialUnleashed;
 
     /**********
     Equipment
@@ -115,8 +120,11 @@ class Character {
     ***********
     **********/
 
-    char.target = this.target = 0;
-    char.isCharging = this.isCharging = 0;
+    char.eTarget = this.eTarget;
+    char.aTarget = this.aTarget;
+    char.isCharging = this.isCharging;
+    char.guarded = this.guarded;
+    char.guarding = this.guarding;
 
     char.attributes = new Attributes(this.attributes.str, this.attributes.dex,
                                        this.attributes.con, this.attributes.eng,
@@ -147,16 +155,20 @@ class Character {
       this.personality = [2,2,2,1,0,0,1,1,2];
       this.personalityName = "Majin";
     }
+    else if(personalityType === "Support") {
+      this.personality = [0,2,1,1,0,1,3,2,2];
+      this.personalityName = "Support";
+    }
     else if(personalityType === "Blaster") {
       this.personality = [1,2,1,2,1,2,0,0,1];
       this.personalityName = "Blaster";
     }
     else if(personalityType === "Tank") {
-      this.personality = [2,-1,2,2,1,1,2,1,1];
+      this.personality = [2,-1,2,2,1,1,3,1,1];
       this.personalityName = "Tank";
     }
     else if(personalityType === "eTank") {
-      this.personality = [-1,2,3,2,1,2,0,2,3];
+      this.personality = [-1,2,3,2,1,2,2,2,3];
       this.personalityName = "Tank";
     }
     else if(personalityType === "AllOut") {
@@ -295,8 +307,8 @@ class Character {
 
       if(this.level % 2 === 0 && this.level >= 300) this.techniquePoints += 2;
       if(this.level % 2 === 0 && this.level >= 600) this.techniquePoints += 3;
-      if(this.level % statPInc === 0 && this.level >= 400) this.statPoints += 2;
-      if(this.level % statPInc === 0 && this.level >= 800) this.statPoints += 2;
+      if(this.level % statPInc === 0 && this.level >= 600) this.statPoints += 2;
+      if(this.level % statPInc === 0 && this.level >= 1000) this.statPoints += 2;
 
       if(this.level % 2 === 0 && this.potentialUnlocked === 1) this.techniquePoints += 1;
       if(this.level % statPInc === 0 && this.potentialUnlocked === 1) this.statPoints += 1;

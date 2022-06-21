@@ -18,10 +18,10 @@ class Battle {
       this.zeniRisk = 0;
       this.itemBox = "None";
       this.raid = 0;
+      this.turn = 0;
 
       this.pCombatants = new Array();
       for(let i = 0; i < players.length; i++) {
-        console.log(players[i].name)
         this.pCombatants.push(players[i]);
       }
       this.NPCombatants = new Array();
@@ -111,11 +111,23 @@ class Battle {
     //also sets the NPC actions when all players have acted; zenkai checked here
     allActed() {
       this.coolDownTick();
+      let pCombPC = 0;
+      let NPCombPC = 0;
+      for(let i = 0; i < this.pCombatants.length; i++) {
+        if(this.pCombatants[i].playerID !== "NPC" && this.pCombatants[i].playerID !== "Random" && this.pCombatants[i].battleCurrAtt.health > 0) pCombPC++;
+      }
+      for(let i = 0; i < this.NPCombatants.length; i++) {
+        if(this.NPCombatants[i].playerID !== "NPC" && this.NPCombatants[i].playerID !== "Random" && this.NPCombatants[i].battleCurrAtt.health > 0 ) NPCombPC++;
+      }
 
       let deadI = 0;
-      console.log(this.pCombatants.length)
       for(let i = 0; i < this.pCombatants.length; i++) {
-        if(this.pCombatants[i].playerID === "NPC" || this.pCombatants[i].playerID === "Random" ) {
+        if(this.pCombatants[i].battleCurrAtt.health <= 0) {
+          deadI++;
+        }
+        else if(pCombPC > this.actions.length || NPCombPC > this.NPCactions.length) {
+        }
+        else if(this.pCombatants[i].playerID === "NPC" || this.pCombatants[i].playerID === "Random" ) {
           let target = -1;
           let targets = new Array();
           for(let z = 0; z < this.NPCombatants.length; z++) {
@@ -166,79 +178,69 @@ class Battle {
 
           this.actions.push(action);
         }
-        else if(this.pCombatants[i].battleCurrAtt.health <= 0) {
-          deadI++;
-        }
-        else if(this.pCombatants.length <= (this.actions.length + deadI)) {
-          return 0;
-        }
       }
 /********************************************************************************/
-console.log(this.actions.length + deadI)
-      if(this.pCombatants.length <= (this.actions.length + deadI)) {
-        deadI = 0;
-        for(let i = 0; i < this.NPCombatants.length; i++) {
-          if(this.NPCombatants[i].battleCurrAtt.health <= 0) {
-             deadI++;
-          }
-          else if(this.NPCombatants[i].playerID === "NPC" || this.NPCombatants[i].playerID === "Random" ) {
-            let target = -1;
-            let targets = new Array();
-            for(let z = 0; z < this.pCombatants.length; z++) {
-              targets.push([z,this.pCombatants[z].battleCurrAtt.con+this.pCombatants[z].battleCurrAtt.eng/2+this.pCombatants[z].battleCurrAtt.stotal/15+this.pCombatants[z].level/20]);
-            }
-            targets.sort(function(a,b) {return b[1] - a[1]});
-            let ind = 0;
-            while(target === -1) {
-              target = targets[ind][0];
-              if(this.pCombatants[target].battleCurrAtt.health <= 0) {
-                target = -1;
-                ind++;
-              }
-            }
-            this.NPCombatants[i].eTarget = target;
-
-            target = -1;
-            targets = new Array();
-            for(let z = 0; z < this.NPCombatants.length; z++) {
-              let priority = 5*this.NPCombatants[z].battleMaxAtt.health/(1+this.NPCombatants[z].battleCurrAtt.health) + this.NPCombatants[z].battleMaxAtt.energy/(1+this.NPCombatants[z].battleCurrAtt.energy);
-              priority *= (this.NPCombatants[z].battleCurrAtt.stotal+this.NPCombatants[z].level)/2;
-              if(this.NPCombatants[i].name+this.NPCombatants[i].playerID === this.NPCombatants[z].name+this.NPCombatants[z].playerID) priority = priority*0.66;
-              targets.push([z,priority]);
-            }
-            targets.sort(function(a,b) {return b[1] - a[1]});
-            ind = 0;
-            while(target === -1) {
-              target = targets[ind][0];
-              if(this.NPCombatants[target].battleCurrAtt.health <= 0) {
-                target = -1;
-                ind++;
-              }
-            }
-            this.NPCombatants[i].aTarget = target;
-
-            let aiChoice = this.AI(this.NPCombatants[i].personality, this.NPCombatants[i],this.pCombatants[this.NPCombatants[i].eTarget],this.NPCombatants[this.NPCombatants[i].aTarget]);
-            let action = aiChoice[1];
-            action.push(i);
-            if(aiChoice[0] === 'e') {
-              action.push(this.NPCombatants[i].eTarget);
-            }
-            else if(aiChoice[0] === 'a') {
-              action.push(-3);
-            }
-            else {
-              action.push(aiChoice[0]);
-            }
-
-            this.NPCactions.push(action);
-          }
-          else if(this.NPCombatants.length <= (this.NPCactions.length + deadI)) {
-            return 0;
-          }
+      deadI = 0;
+      for(let i = 0; i < this.NPCombatants.length; i++) {
+        if(this.NPCombatants[i].battleCurrAtt.health <= 0) {
+          deadI++;
         }
-        return 1;
+        else if(NPCombPC > this.NPCactions.length || pCombPC > this.actions.length) {
+        }
+        else if(this.NPCombatants[i].playerID === "NPC" || this.NPCombatants[i].playerID === "Random" ) {
+          let target = -1;
+          let targets = new Array();
+          for(let z = 0; z < this.pCombatants.length; z++) {
+            targets.push([z,this.pCombatants[z].battleCurrAtt.con+this.pCombatants[z].battleCurrAtt.eng/2+this.pCombatants[z].battleCurrAtt.stotal/15+this.pCombatants[z].level/20]);
+          }
+          targets.sort(function(a,b) {return b[1] - a[1]});
+          let ind = 0;
+          while(target === -1) {
+            target = targets[ind][0];
+            if(this.pCombatants[target].battleCurrAtt.health <= 0) {
+              target = -1;
+              ind++;
+            }
+          }
+          this.NPCombatants[i].eTarget = target;
+
+          target = -1;
+          targets = new Array();
+          for(let z = 0; z < this.NPCombatants.length; z++) {
+            let priority = 5*this.NPCombatants[z].battleMaxAtt.health/(1+this.NPCombatants[z].battleCurrAtt.health) + this.NPCombatants[z].battleMaxAtt.energy/(1+this.NPCombatants[z].battleCurrAtt.energy);
+            priority *= (this.NPCombatants[z].battleCurrAtt.stotal+this.NPCombatants[z].level)/2;
+            if(this.NPCombatants[i].name+this.NPCombatants[i].playerID === this.NPCombatants[z].name+this.NPCombatants[z].playerID) priority = priority*0.66;
+            targets.push([z,priority]);
+          }
+          targets.sort(function(a,b) {return b[1] - a[1]});
+          ind = 0;
+          while(target === -1) {
+            target = targets[ind][0];
+            if(this.NPCombatants[target].battleCurrAtt.health <= 0) {
+              target = -1;
+              ind++;
+            }
+          }
+          this.NPCombatants[i].aTarget = target;
+
+          let aiChoice = this.AI(this.NPCombatants[i].personality, this.NPCombatants[i],this.pCombatants[this.NPCombatants[i].eTarget],this.NPCombatants[this.NPCombatants[i].aTarget]);
+          let action = aiChoice[1];
+          action.push(i);
+          if(aiChoice[0] === 'e') {
+            action.push(this.NPCombatants[i].eTarget);
+          }
+          else if(aiChoice[0] === 'a') {
+            action.push(-3);
+          }
+          else {
+            action.push(aiChoice[0]);
+          }
+
+          this.NPCactions.push(action);
+        }
       }
-      return 0;
+      if(this.NPCombatants.length <= (this.NPCactions.length + deadI) && (this.pCombatants.length <= (this.actions.length + deadI))) return 1;
+      else return 0;
     }
 
     AI(personality, npc, target, ally) {
@@ -490,6 +492,7 @@ console.log(this.actions.length + deadI)
     }
 
     executeActions() {
+      this.turn++;
       for(let i = 0; i < this.actions.length; i++) {
         if(this.pCombatants[this.actions[i][2]].isTransformed != -1) {
           this.actions[i][1] += '\n' + this.pCombatants[this.actions[i][2]].transformationCost(this.techList[this.pCombatants[this.actions[i][2]].transformation]);
@@ -518,14 +521,21 @@ console.log(this.actions.length + deadI)
             this.pCombatants[this.actions[i][2]].statRegen();
             if(this.NPCombatants[this.actions[i][3]].guarded === -1) this.NPCombatants[this.actions[i][3]].takeDamage(this.actions[i][0]);
             else {
-              let guardDam = Math.round(this.actions[i][0]*0.15);
-              let damReduct = Math.round(this.actions[i][0]*0.25).toLocaleString(undefined);
-              this.actions[i][0] = this.actions[i][0]*0.75;
               let index = this.NPCombatants.map(function(e) { return e.name+e.playerID; }).indexOf(this.NPCombatants[this.actions[i][3]].guarded);
-              this.NPCombatants[this.actions[i][3]].takeDamage(this.actions[i][0]);
-              this.NPCombatants[index].takeDamage(guardDam);
-              this.actions[i][1] = this.actions[i][1] + "\nBut" + this.pCombatants[this.actions[i][2]].name.replace(/\_/g,' ') + "'s attack has been guarded, and the damage was reduced by " + damReduct + "!"
-              this.actions[i][1] = this.actions[i][1] + "\n" + this.NPCombatants[index].name.replace(/\_/g,' ') + " takes " + guardDam.toLocaleString(undefined) + " of the damage."
+              if(this.NPCombatants[index].battleCurrAtt.health <= 0) {
+                this.NPCombatants[this.actions[i][3]].takeDamage(this.actions[i][0]);
+                this.NPCombatants[this.actions[i][3]].guarded = -1;
+                this.NPCombatants[index].guarding = -1;
+              }
+              else {
+                let guardDam = Math.round(this.actions[i][0]*0.15);
+                let damReduct = Math.round(this.actions[i][0]*0.25).toLocaleString(undefined);
+                this.actions[i][0] = this.actions[i][0]*0.75;
+                this.NPCombatants[this.actions[i][3]].takeDamage(this.actions[i][0]);
+                this.NPCombatants[index].takeDamage(guardDam);
+                this.actions[i][1] = this.actions[i][1] + "\nBut " + this.pCombatants[this.actions[i][2]].name.replace(/\_/g,' ') + "'s attack has been guarded, and the damage was reduced by " + damReduct + "!"
+                this.actions[i][1] = this.actions[i][1] + "\n" + this.NPCombatants[index].name.replace(/\_/g,' ') + " takes " + guardDam.toLocaleString(undefined) + " of the damage."
+              }
             }
 
             if(this.NPCombatants[this.actions[i][3]].battleCurrAtt.health <= 0) {
@@ -564,14 +574,21 @@ console.log(this.actions.length + deadI)
             this.NPCombatants[this.NPCactions[i][2]].statRegen();
             if(this.pCombatants[this.NPCactions[i][3]].guarded === -1) this.pCombatants[this.NPCactions[i][3]].takeDamage(this.NPCactions[i][0]);
             else {
-              let guardDam = Math.round(this.NPCactions[i][0]*0.15);
-              let damReduct = Math.round(this.NPCactions[i][0]*0.25).toLocaleString(undefined);
-              this.NPCactions[i][0] = Math.round(this.NPCactions[i][0]*0.75);
               let index = this.pCombatants.map(function(e) { return e.name+e.playerID; }).indexOf(this.pCombatants[this.NPCactions[i][3]].guarded);
-              this.pCombatants[this.NPCactions[i][3]].takeDamage(this.NPCactions[i][0]);
-              this.pCombatants[index].takeDamage(guardDam);
-              this.NPCactions[i][1] = this.NPCactions[i][1] + "\nBut " + this.NPCombatants[this.NPCactions[i][2]].name.replace(/\_/g,' ') + "'s attack has been guarded, and the damage was reduced by " + damReduct + "!"
-              this.NPCactions[i][1] = this.NPCactions[i][1] + "\n" + this.pCombatants[index].name.replace(/\_/g,' ') + " takes " + guardDam.toLocaleString(undefined) + " of the damage."
+              if(this.pCombatants[index].battleCurrAtt.health <= 0) {
+                this.pCombatants[this.NPCactions[i][3]].takeDamage(this.NPCactions[i][0]);
+                this.pCombatants[this.NPCactions[i][3]].guarded = -1;
+                this.pCombatants[index].guarding = -1;
+              }
+              else {
+                let guardDam = Math.round(this.NPCactions[i][0]*0.15);
+                let damReduct = Math.round(this.NPCactions[i][0]*0.25).toLocaleString(undefined);
+                this.NPCactions[i][0] = Math.round(this.NPCactions[i][0]*0.75);
+                this.pCombatants[this.NPCactions[i][3]].takeDamage(this.NPCactions[i][0]);
+                this.pCombatants[index].takeDamage(guardDam);
+                this.NPCactions[i][1] = this.NPCactions[i][1] + "\nBut " + this.NPCombatants[this.NPCactions[i][2]].name.replace(/\_/g,' ') + "'s attack has been guarded, and the damage was reduced by " + damReduct + "!"
+                this.NPCactions[i][1] = this.NPCactions[i][1] + "\n" + this.pCombatants[index].name.replace(/\_/g,' ') + " takes " + guardDam.toLocaleString(undefined) + " of the damage."
+              }
             }
 
             if(this.pCombatants[this.NPCactions[i][3]].battleCurrAtt.health <= 0) {
@@ -683,7 +700,7 @@ console.log(this.actions.length + deadI)
         damage = Math.round(target.battleMaxAtt.health*0.08);
         s = 1;
       }
-      str = str + '\n' + (attacker.name.replace(/\_/g,' ') + " used a strike and dealt " + damage.toLocaleString(undefined) + ' damage in ' + s + ' hits!');
+      str = str + '\n' + (attacker.name.replace(/\_/g,' ') + " used a strike and dealt " + damage.toLocaleString(undefined) + ' damage in ' + s + ' hits to ' + target.name.replace(/\_/g,' ') + '!');
       return [damage,str];
     }
   
@@ -749,7 +766,7 @@ console.log(this.actions.length + deadI)
         damage = Math.round(target.battleMaxAtt.health*0.08);
         s = 1;
       }
-      str = str + '\n' + (attacker.name.replace(/\_/g,' ') + " used a burst and dealt " + damage.toLocaleString(undefined) + ' damage in ' + s + ' hits!');
+      str = str + '\n' + (attacker.name.replace(/\_/g,' ') + " used a burst and dealt " + damage.toLocaleString(undefined) + ' damage in ' + s + ' hits to ' + target.name.replace(/\_/g,' ') + '!');
       return [damage,str];
     }
   
@@ -835,7 +852,7 @@ console.log(this.actions.length + deadI)
         //clean up and msg.channel.send
         damage = Math.round(damage);
         if(damage < 0) damage = 0;
-        str = str + '\n' + damage.toLocaleString(undefined) + ' damage taken in ' + s + ' hits!';
+        str = str + '\n' + damage.toLocaleString(undefined) + ' damage taken in ' + s + ' hits to ' + target.name.replace(/\_/g,' ') + '!';
         return [damage,str];
       }
       else if(technique.techType == 'Buff') {
@@ -912,7 +929,7 @@ console.log(this.actions.length + deadI)
         //check for resist, return 0
         calcResist = (1 - calcResist[0]) * 100;
         if(resist >= calcResist) {
-          str = str + '\n' + attacker.name.replace(/\_/g,' ') + "'s technique was resisted!";
+          str = str + '\n' + attacker.name.replace(/\_/g,' ') + "'s technique was resisted by " + target.name.replace(/\_/g,' ') + "!";
           return [0,str];
         }
 
@@ -951,8 +968,11 @@ console.log(this.actions.length + deadI)
           restore = Math.round(restore * attacker.battleCurrAtt.critDamage);
         }
 
+        //todo: new variable hpRestore/epRestore to apply on regen instead?
         target.battleCurrAtt.health += Math.round(technique.health*restore);
         target.battleCurrAtt.energy += Math.round(technique.energy*restore);
+        target.battleCurrAtt.health = Math.min(target.battleCurrAtt.health,target.battleMaxAtt.health);
+        target.battleCurrAtt.energy = Math.min(target.battleCurrAtt.energy,target.battleMaxAtt.energy);
 
         if(technique.health*restore > 0) str = str + '\n' + Math.round(technique.health*restore).toLocaleString(undefined) + ' health restored!';
         if(technique.energy*restore > 0) str = str + '\n' + Math.round(technique.energy*restore).toLocaleString(undefined) + ' energy restored!';

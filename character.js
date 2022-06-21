@@ -333,8 +333,8 @@ class Character {
       this.statusUpdate(0);
       
       count++;
-      if(count > 1) str = ('\n' + this.name + " has leveled up " + count + " times!");
-      else str = ('\n' + this.name + " has leveled up!");
+      if(count > 1) str = ('\n' + this.name.replace(/\_/g,' ') + " has leveled up " + count.toLocaleString(undefined) + " times!");
+      else str = ('\n' + this.name.replace(/\_/g,' ') + " has leveled up!");
 		}
     return str;
 	}

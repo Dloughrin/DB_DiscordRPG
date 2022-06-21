@@ -92,6 +92,7 @@ class Raid {
 		elder.fightingStyle = fighting;
 		elder.styleName = "Sage_Style";
   	elder.level = char.level;
+  	elder.image = "https://cdn.discordapp.com/attachments/832585611486691408/988682923148443658/unknown.png";
 		elder.setPersonality("Support");
 		elder.addTechnique(31, 'NPC');
 		elder.addTechnique(36, 'NPC');
@@ -107,6 +108,7 @@ class Raid {
 		elderGuard.fightingStyle = fighting;
 		elderGuard.styleName = "Guardian_Style";
   	elderGuard.level = char.level;
+  	elderGuard.image = "https://cdn.discordapp.com/attachments/832585611486691408/988683220881137724/unknown.png";
 		elderGuard.setPersonality("Tank");
 		elderGuard.addTechnique(39, 'NPC');
 		elderGuard.addTechnique(14, 'NPC');
@@ -124,6 +126,7 @@ class Raid {
 		supporter.fightingStyle = fighting;
 		supporter.styleName = "Sage_Style";
   	supporter.level = char.level;
+  	supporter.image = "https://cdn.discordapp.com/attachments/832585611486691408/988683624419307530/unknown.png";
 		supporter.setPersonality("Support");
 		supporter.addTechnique(31, 'NPC');
 		supporter.addTechnique(37, 'NPC');

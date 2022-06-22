@@ -40,6 +40,12 @@ class Character {
 
     this.potentialUnlocked = 0;
     this.potentialUnleashed = 0;
+    if(this.playerID === "Random" || this.playerID === "NPC") {
+      this.potentialUnlocked = 1;
+      this.potentialUnleashed = 1;
+      this.race.unlockPotential(1);
+      this.race.unleashPotential(1);
+    }
 
     /**********
     Equipment
@@ -139,6 +145,23 @@ class Character {
     char.statusUpdate(0);
     return char;
   }
+
+  unlockPotential() {
+    if(parseInt(this.potentialUnlocked) === 0) {
+      this.potentialUnlocked = 1;
+      this.attributes.str = Math.min(Math.round(this.attributes.str * 1.1),(this.attributes.str + 10));
+      this.attributes.dex = Math.min(Math.round(this.attributes.dex * 1.1),(this.attributes.dex + 10));
+      this.attributes.con = Math.min(Math.round(this.attributes.con * 1.15),(this.attributes.con + 15));
+      this.attributes.eng = Math.min(Math.round(this.attributes.eng * 1.15),(this.attributes.eng + 15));
+      this.attributes.foc = Math.min(Math.round(this.attributes.foc * 1.1),(this.attributes.foc + 10));
+      this.attributes.sol = Math.min(Math.round(this.attributes.sol * 1.1),(this.attributes.sol + 10));
+      this.statusUpdate(0);
+      return 1;
+    }
+    else return 0;
+  } 
+
+  unleashPotential() {}
 
   setPersonality(personalityType) {
     if(this.race.raceName === "Android" || this.race.raceName === "Majin") personalityType = this.race.raceName;
@@ -330,6 +353,13 @@ class Character {
         this.attributes.foc += this.race.foc;
       }
 
+      if(this.attributes.str > this.race.maxStr) this.attributes.str = this.race.maxStr;
+      if(this.attributes.dex > this.race.maxDex) this.attributes.dex = this.race.maxDex;
+      if(this.attributes.con > this.race.maxCon) this.attributes.con = this.race.maxCon;
+      if(this.attributes.eng > this.race.maxEng) this.attributes.eng = this.race.maxEng;
+      if(this.attributes.sol > this.race.maxSol) this.attributes.sol = this.race.maxSol;
+      if(this.attributes.foc > this.race.maxFoc) this.attributes.foc = this.race.maxFoc;
+
       this.statusUpdate(0);
       
       count++;
@@ -359,6 +389,9 @@ class Character {
 
   statusUpdate(chargeStart) {
       if(chargeStart === null) chargeStart = 0;
+      this.race.unlockPotential(this.potentialUnlocked);
+      this.race.unleashPotential(this.potentialUnleashed);
+
       this.attributes.calculate(this.level);
       this.attributes.stotal = this.attributes.str + this.attributes.dex + this.attributes.con + this.attributes.eng + this.attributes.sol + this.attributes.foc + 1;
       this.calculateBonusAtt();

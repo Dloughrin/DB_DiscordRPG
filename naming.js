@@ -48,16 +48,19 @@ class Naming {
 		];
 
 		/*
+		name.search(stuff)
 		Strike 
 			Fast Blade: Katana, Longsword, Shortsword, Dagger
 			Slow Blade: Greatsword, Greataxe, Battle-axe
-			Fist: Unarmed, Gauntlets, Gloves, Fingerless_Gloves, Armband
 			Polearm: Polearm, Cane, Stave, Staff
+			Fist: Unarmed, Gauntlets, Gloves, Fingerless_Gloves, Armband
+			Other (Kick): Gun, Wand, Focus
 		Burst
 			Staff: Staff, Stave, Cane
 			Wand: Rod, Wand, Scepter
 			Gun: Gun, Energy_Gun
-			Focus: Unarmed, Focus, Gloves, Orb, Fingerless_Gloves
+			Focus: Focus, Orb
+			Other: Unarmed, Gloves, Fingerless_Gloves
 		*/
 		this.weapons =
 		[

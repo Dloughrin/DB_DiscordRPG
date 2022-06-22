@@ -79,7 +79,7 @@ class Attributes {
 
 		this.health = Math.round((50 + (this.con*1.25+2)*level*10)*this.btotal.health);
 		this.energy = Math.round((10 + (this.eng*1.1+1)*level*10)*this.btotal.energy);
-		this.charge = Math.round(((((this.sol*0.66)+(this.foc*0.2)+(this.dex*0.1)+(this.eng*0.3)+(this.str*0.66)+1))/20)*this.btotal.charge);
+		this.charge = Math.round(((((this.sol*0.66)+(this.foc*0.2)+(this.dex*0.1)+(this.con*0.1)+(this.eng*0.3)+(this.str*0.66)+1))/20)*this.btotal.charge);
 		this.calcAdvStats(level);
 	}
 

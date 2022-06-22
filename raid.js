@@ -83,8 +83,27 @@ class Raid {
 		return npcList;
 	}
 
+	static raidReward(raidID, char) { 
+		let str = ""
+		if(raidID === 1) {
+				if(parseInt(char.potentialUnlocked) === 0) {
+					let z = char.unlockPotential();
+					if(z === 1) str = char.name + " has unlocked their potential! Boost to all attributes, and increased maximum value for fighting styles!";
+				}
+		}
+		else if(raidID === 2) {
+			if(char.potentialUnlocked === 0) {
+				let z = char.partyList[i].unleashPotential();
+				if(z === 1) str = char.partyList[i].name + " has unleashed their potential!";
+			}
+		}
+		else { }
+
+		return str;
+	}
+
 	//potential unlocked: epic box reward for first time, as well as the tag to double stat/technique point gain. small 'zenkai'-like boost
-	static namekianTrial(techList, char, ID) { 
+	static sageTrial(techList, char, ID) { 
 		let attr = new Attributes(30,30,70,120,80,130);
   	let elder = new Character("Grand_Elder",new Races("Dragon_Clan"),attr,"Random");
 		let fighting = new AttributeBonus("Sage_Style","Fighting Style");
@@ -132,8 +151,16 @@ class Raid {
 		supporter.addTechnique(37, 'NPC');
 		supporter.statusUpdate(0);
 
+		//[char,supporter]
 		let trial = new Battle([char,supporter],party.partyList,ID,techList);
 		trial.raid = 1;
+		trial.expMod = 1.5;
+		if(char.potentialUnlocked === 0) {
+			trial.expMod += 0.25;
+			trial.itemBox = "Epic";
+		}
+		else trial.itemBox = "Standard";
+
 		return trial;
 	}
 

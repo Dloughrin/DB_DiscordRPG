@@ -3,7 +3,7 @@ const attbonus = require("./attributeBonus.js");
 const AttributeBonus = attbonus.AttributeBonus;
 
 class Races {
-	static max = 150;
+	static max = 200;
 	constructor(raceName) {
 		if(raceName === 7) raceName = Math.floor(Math.random() * 9)
 
@@ -38,12 +38,36 @@ class Races {
 		}
 
 
-		this.maxStr = Races.max+Races.max*this.bstr*2;
-		this.maxDex = Races.max+Races.max*this.bdex*2;
-		this.maxCon = Races.max+Races.max*this.bcon*2;
-		this.maxEng = Races.max+Races.max*this.beng*2;
-		this.maxSol = Races.max+Races.max*this.bsol*2;
-		this.maxFoc = Races.max+Races.max*this.bfoc*2;
+		this.isUnlocked = 0;
+		this.isUnleashed = 0;
+		this.maxStr = Races.max+Races.max*(this.bstr+this.bdex)*3;
+		this.maxDex = Races.max+Races.max*(this.bstr+this.bdex)*3;
+		this.maxCon = Races.max+Races.max*(this.bcon+this.beng)*3;
+		this.maxEng = Races.max+Races.max*(this.bcon+this.beng)*3;
+		this.maxSol = Races.max+Races.max*(this.bfoc+this.bsol)*3;
+		this.maxFoc = Races.max+Races.max*(this.bfoc+this.bsol)*3;
+	}
+
+	unlockPotential(unlocked) {
+		if(this.isUnlocked === 1 || unlocked === 0) return;
+		this.maxStr *= 1+2*unlocked;
+		this.maxDex *= 1+2*unlocked;
+		this.maxCon *= 1+2*unlocked;
+		this.maxEng *= 1+2*unlocked;
+		this.maxSol *= 1+2*unlocked;
+		this.maxFoc *= 1+2*unlocked;
+		this.isUnlocked = 1;
+	}
+
+	unleashPotential(unleashed) {
+		if(this.isUnleashed === 1 || unleashed === 0) return;
+		this.maxStr *= 1+(1+Math.ceil(this.bstr+this.bdex))*unleashed;
+		this.maxDex *= 1+(1+Math.ceil(this.bstr+this.bdex))*unleashed;
+		this.maxCon *= 1+(1+Math.ceil(this.bcon+this.beng))*unleashed;
+		this.maxEng *= 1+(1+Math.ceil(this.bcon+this.beng))*unleashed;
+		this.maxSol *= 1+(1+Math.ceil(this.bfoc+this.bsol))*unleashed;
+		this.maxFoc *= 1+(1+Math.ceil(this.bfoc+this.bsol))*unleashed;
+		this.isUnleashed = 1;
 	}
 
 	setUpRace(s, d, c, e, so, f, name) {

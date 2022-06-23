@@ -42,9 +42,7 @@ class Character {
     this.potentialUnleashed = 0;
     if(this.playerID === "Random" || this.playerID === "NPC") {
       this.potentialUnlocked = 1;
-      this.potentialUnleashed = 1;
-      this.race.unlockPotential(1);
-      this.race.unleashPotential(1);
+      this.race.unlockPotential();
     }
 
     /**********
@@ -161,13 +159,26 @@ class Character {
     else return 0;
   } 
 
-  unleashPotential() {}
+  unleashPotential(unleashing) {
+    if(parseInt(this.potentialUnleashed) === 0 && parseInt(unleashing) === 1) {
+      this.potentialUnleashed = 1;
+      this.race.bstr += this.race.bstr/2+0.1;
+      this.race.bdex += this.race.bdex/2+0.1;
+      this.race.bcon += this.race.bcon/2+0.1;
+      this.race.beng += this.race.beng/2+0.1;
+      this.race.bsol += this.race.bsol/2+0.1;
+      this.race.bfoc += this.race.bfoc/2+0.1;
+      this.statusUpdate(0);
+      return 1;
+    }
+    else return 0;
+  }
 
   setPersonality(personalityType) {
     if(this.race.raceName === "Android" || this.race.raceName === "Majin") personalityType = this.race.raceName;
     //[strike,burst,charge,transform,strike tech,ki tech,buff,debuff,restoration]
     if(personalityType === "Striker") {
-      this.personality = [2,1,1,2,2,1,1,0,0];
+      this.personality = [2,1,1,4,2,1,1,0,0];
       this.personalityName = "Striker";
     }
     else if(personalityType === "Android") {
@@ -182,8 +193,12 @@ class Character {
       this.personality = [0,2,1,1,0,1,3,2,2];
       this.personalityName = "Support";
     }
+    else if(personalityType === "Healer") {
+      this.personality = [0,2,1,1,0,2,2,2,5];
+      this.personalityName = "Healer";
+    }
     else if(personalityType === "Blaster") {
-      this.personality = [1,2,1,2,1,2,0,0,1];
+      this.personality = [1,2,1,2,1,4,0,0,1];
       this.personalityName = "Blaster";
     }
     else if(personalityType === "Tank") {
@@ -246,7 +261,7 @@ class Character {
   }
 
   equipItem(type,item) {
-    if(!item) return;
+    if(item === null) return;
     if(type == "Dogi") {
       this.dogi = item;
       this.battleMaxAtt.buffs.push(this.dogi.attbonus);
@@ -328,13 +343,13 @@ class Character {
       if(this.level % 2 === 0) this.techniquePoints += 1;
       if(this.level % statPInc === 0) this.statPoints += 1;
 
-      if(this.level % 2 === 0 && this.level >= 300) this.techniquePoints += 2;
       if(this.level % 2 === 0 && this.level >= 600) this.techniquePoints += 3;
-      if(this.level % statPInc === 0 && this.level >= 600) this.statPoints += 2;
-      if(this.level % statPInc === 0 && this.level >= 1000) this.statPoints += 2;
+      else if(this.level % 2 === 0 && this.level >= 300) this.techniquePoints += 2;
+      if(this.level % statPInc === 0 && this.level >= 1000) this.statPoints += 3;
+      else if(this.level % statPInc === 0 && this.level >= 600) this.statPoints += 2;
 
-      if(this.level % 2 === 0 && this.potentialUnlocked === 1) this.techniquePoints += 1;
-      if(this.level % statPInc === 0 && this.potentialUnlocked === 1) this.statPoints += 1;
+      if(this.level % 2 === 0 && parseInt(this.potentialUnlocked) === 1) this.techniquePoints += 1;
+      if(this.level % statPInc === 0 && parseInt(this.potentialUnlocked) === 1) this.statPoints += 1;
 
       if(this.level % attBoostInc === 0) {
         this.attributes.str += this.race.str;
@@ -540,7 +555,7 @@ class Character {
       this.removeBuff(this.isTransformed);
       this.isTransformed = -1;
 
-      let str = this.name + ' can no longer hold their transformation!';
+      let str = this.name.replace(/\_/g,' ') + ' can no longer hold their transformation!';
       return str;
     }
     else return '';

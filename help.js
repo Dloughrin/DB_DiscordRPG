@@ -396,9 +396,9 @@ class Help {
 				return [str,null];
 			}
 			else if(topic === "Android") {
-				let str = "**Mainstat Multipliers** 10% Str, 20% Dex, 20% Con, -20% Eng, 5% Sol, 5% Foc"
+				let str = "**Mainstat Multipliers** 20% Str, 5% Dex, 20% Con, -20% Eng, 10% Sol, 5% Foc"
 				str = str + "\n**Other Bonuses** -100% Magic Power, -60% Energy, 25% Energy Defense, 50% Magic Defense"
-				str = str + "\n**Levelup Bonus** 3 Str, 3 Dex, 2 Con, 1 Eng, 1 Sol, 1 Foc"
+				str = str + "\n**Levelup Bonus** 3 Str, 2 Dex, 2 Con, 1 Eng, 2 Sol, 2 Foc"
 				str = str + "\n**Racial Mechanic** Unlimited Energy; Androids regain nearly all of their energy pool every turn."
 				str = str + "\n**Androids** have a heavily reduced Energy pool, with 20% of their Eng stat being reduced, as well as the Eng stat scaling 60% worst. However, with Unlimited Energy, they can use as many techniques as they wish and never run into issues. They can make decent tanks, or any kind of technique spammer."
 				return [str,null];
@@ -435,7 +435,7 @@ class Help {
 			else if(topic === "Alien") {
 				let str = "**Mainstat Multipliers** 10% Str, 10% Dex, 20% Con, 20% Eng, 0% Sol, 10% Foc"
 				str = str + "\n**Other Bonuses** 10% Charge Bonus, 10% Max Charge, 10% Health, 10% Energy, 20% Regen, 10% Crit Rate"
-				str = str + "\n**Levelup Bonus** 1 Str, 1 Dex, 3 Con, 3 Eng, 1 Sol, 2 Foc"
+				str = str + "\n**Levelup Bonus** 2 Str, 1 Dex, 3 Con, 3 Eng, 1 Sol, 2 Foc"
 				str = str + "\n**'Alien'** is the catch-all group for any race either unnamed or unlisted for the game. They're a fairly versatile race, similar to Earthlings, but work better as tanks than support."
 				return [str,null];
 			}

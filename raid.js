@@ -5,7 +5,9 @@ const party = require("./party.js");
 const races = require("./races.js");
 const attbonus = require("./attributeBonus.js");
 const batt = require("./battle.js");
+const equip = require("./equipment.js");
 
+const Equipment = equip.Equipment;
 const AttributeBonus = attbonus.AttributeBonus;
 const Battle = batt.Battle;
 const Races = races.Races;
@@ -22,68 +24,21 @@ const Technique = tech.Technique;
 ******************/
 class Raid {
 	constructor(choice) { 
-		/*this.raidBoss = null;
-		this.subBoss = null;
-		this.subBossNum = 0;
-		this.multi = 1;
-
-		this.allyNames = new Array();
-
-		/*if(choice === 0) {
-			this.raidBoss = this.broly();
-			this.multi = 1.2;
-			this.allyNames.push(["Future_Trunks",0.55]);
-			this.allyNames.push(["Goku",0.65]);
-			this.allyNames.push(["Vegeta",0.6]);
-		}
-		else if(choice === 1) {
-			this.raidBoss = this.cell();
-			this.subBoss = this.cellJR();
-			this.subBossNum = 3;
-			this.allyNames.push(["Future_Trunks",0.6]);
-			this.allyNames.push(["Teen_Gohan",1.05]);
-			this.allyNames.push(["Goku",0.85]);
-			this.allyNames.push(["Vegeta",0.7]);
-			this.allyNames.push(["Piccolo",0.5]);
-		}
-		else if(choice === 2) {
-			this.raidBoss = this.superBuu();
-			this.multi = 1.2;
-			this.allyNames.push(["Gotenks",0.8]);
-			this.allyNames.push(["Piccolo",0.6]);
-		}
-		else if(choice === 3) {
-			this.raidBoss = this.gokuBlack();
-			this.subBoss = this.zamasu();
-			this.multi = 1.25;
-			this.subBossNum = 1;
-			this.allyNames.push(["Goku",0.8]);
-			this.allyNames.push(["Vegeta",0.8]);
-			this.allyNames.push(["Future_Trunks",0.5]);
-		}*/
 	}
 
-	scaleStats(party, npcList) { 
-		let statTotal = 0;
-		for(let i = 0; i < party.partyList.length; i++) {
-			statTotal += party.partyList[i].attributes.stotal;
-		}
-		statTotal = statTotal/party.partyList.length;
-
-		for(let i = 0; i < npcList.partyList.length; i++) {
-			let scalar = statTotal/npcList.partyList[i].attributes.stotal;
-			npcList.partyList[i].attributes.str *= scalar;
-			npcList.partyList[i].attributes.dex *= scalar;
-			npcList.partyList[i].attributes.con *= scalar;
-			npcList.partyList[i].attributes.eng *= scalar;
-			npcList.partyList[i].attributes.foc *= scalar;
-			npcList.partyList[i].attributes.sol *= scalar;
-			npcList.partyList[i].statusUpdate(0);
-		}
-		return npcList;
+	static scaleStats(char, stotal) { 
+		let scalar = stotal/char.attributes.stotal;
+		char.attributes.str *= scalar;
+		char.attributes.dex *= scalar;
+		char.attributes.con *= scalar;
+		char.attributes.eng *= scalar;
+		char.attributes.foc *= scalar;
+		char.attributes.sol *= scalar;
+		char.statusUpdate(0);
+		return char;
 	}
 
-	static raidReward(raidID, char) { 
+	static raidReward(raidID, char, user) { 
 		let str = ""
 		if(raidID === 1) {
 				if(parseInt(char.potentialUnlocked) === 0) {
@@ -92,9 +47,13 @@ class Raid {
 				}
 		}
 		else if(raidID === 2) {
-			if(char.potentialUnlocked === 0) {
-				let z = char.partyList[i].unleashPotential();
-				if(z === 1) str = char.partyList[i].name + " has unleashed their potential!";
+			if(char.potentialUnleashed === 0) {
+				let z = char.unleashPotential(1);
+				if(z === 1) str = char.name + " has unleashed their potential! Their racial bonuses are now increased drastically.";
+				if(parseInt(user.kai) === 0) {
+					user.kai = 1;
+					str += "\n**Additionally, you can now make characters with the Core Person race.**"
+				}
 			}
 		}
 		else { }
@@ -104,19 +63,21 @@ class Raid {
 
 	//potential unlocked: epic box reward for first time, as well as the tag to double stat/technique point gain. small 'zenkai'-like boost
 	static sageTrial(techList, char, ID) { 
+  	let level = Math.max(400,char.level);
 		let attr = new Attributes(30,30,70,120,80,130);
   	let elder = new Character("Grand_Elder",new Races("Dragon_Clan"),attr,"Random");
 		let fighting = new AttributeBonus("Sage_Style","Fighting Style");
 		fighting.loadBonuses(0,0,0.05,0.05,0,0.15,0,0,0,0,0.1,0,0,0,0,0,0,0,0,0,0,0.15,0,0,0);
 		elder.fightingStyle = fighting;
 		elder.styleName = "Sage_Style";
-  	elder.level = char.level;
+  	elder.level = level;
   	elder.image = "https://cdn.discordapp.com/attachments/832585611486691408/988682923148443658/unknown.png";
 		elder.setPersonality("Support");
 		elder.addTechnique(31, 'NPC');
 		elder.addTechnique(36, 'NPC');
 		elder.addTechnique(37, 'NPC');
 		elder.addTechnique(38, 'NPC');
+		elder.addTechnique(12, 'NPC');
 		elder.statusUpdate(0);
 
 
@@ -126,12 +87,14 @@ class Raid {
 		fighting.loadBonuses(0.05,0.05,0.05,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.05,0,0.15,0.15,0,0,0,0);
 		elderGuard.fightingStyle = fighting;
 		elderGuard.styleName = "Guardian_Style";
-  	elderGuard.level = char.level;
+  	elderGuard.level = level;
   	elderGuard.image = "https://cdn.discordapp.com/attachments/832585611486691408/988683220881137724/unknown.png";
 		elderGuard.setPersonality("Tank");
 		elderGuard.addTechnique(39, 'NPC');
 		elderGuard.addTechnique(14, 'NPC');
-		elderGuard.addTechnique(40, 'NPC');
+		elderGuard.addTechnique(14, 'NPC');
+		elderGuard.addTechnique(16, 'NPC');
+		elderGuard.addTechnique(41, 'NPC');
 		elderGuard.setTransformation(24, 'NPC');
 		elderGuard.statusUpdate(0);
 
@@ -144,11 +107,12 @@ class Raid {
 		fighting.loadBonuses(0,0,0.05,0.05,0,0.1,0,0,0,0,0.05,0,0,0,0,0,0,0,0,0,0,0.1,0,0,0);
 		supporter.fightingStyle = fighting;
 		supporter.styleName = "Sage_Style";
-  	supporter.level = char.level;
+  	supporter.level = level-40;
   	supporter.image = "https://cdn.discordapp.com/attachments/832585611486691408/988683624419307530/unknown.png";
 		supporter.setPersonality("Support");
 		supporter.addTechnique(31, 'NPC');
 		supporter.addTechnique(37, 'NPC');
+		supporter.addTechnique(12, 'NPC');
 		supporter.statusUpdate(0);
 
 		//[char,supporter]
@@ -165,7 +129,96 @@ class Raid {
 	}
 
 	//potential unleashed: mythic box reward for first time, as well as the tag to gain potential unleashed passive (10% all stats + 50% of racial bonus)
-	static kaioshinTrial() { }
+	static kaioshinTrial(techList, char, ID, Gohan) { //techList, char, ID
+															//str,dex,c,e,sol,foc
+  	let level = Math.max(400,char.level);
+		let attr = new Attributes(60,170,110,90,150,370);
+  	let kaioshin = new Character("Supreme_Kai",new Races("Core_Person"),attr,"Random");
+		let fighting = new AttributeBonus("Sage_Style","Fighting Style");
+		fighting.loadBonuses(0,0.15,0,0,0.05,0.4,0,0,0,0,0,0,0,0,0,0,0.2,0,0,0,0,0,0,0,0.2);
+		kaioshin.fightingStyle = fighting;
+		kaioshin.styleName = "Kai_Style";
+  	kaioshin.level = level;
+  	kaioshin.image = "https://cdn.discordapp.com/attachments/986234335051018340/989266058160529459/unknown.png";
+		kaioshin.setPersonality("Blaster");
+		kaioshin.setTransformation(33, 'NPC');
+		kaioshin.addTechnique(42, 'NPC'); 
+		kaioshin.addTechnique(43, 'NPC'); 
+		kaioshin.addTechnique(44, 'NPC'); 
+		kaioshin.addTechnique(32, 'NPC'); 
+		kaioshin.addTechnique(36, 'NPC'); 
+
+		let equipThing = new AttributeBonus("Kaioshin's_Dogi","Dogi")
+		equipThing.loadBonuses(0,0,0.10,0.10,0,0.12,0,0,0,0,0,0,0,0,0,0.10,0.15,0.15,0,0,0,0,0,0,0.2);
+		let kdogi = new Equipment(-1,[equipThing,5], "Dogi");
+		kaioshin.dogi = kdogi;
+		kaioshin.statusUpdate(0);
+
+		attr = new Attributes(50,120,130,75,135,350);
+  	let kaiApprentice = new Character("Apprentice_Kai",new Races("Core_Person"),attr,"Random");
+		fighting = new AttributeBonus("Sage_Style","Fighting Style");
+		fighting.loadBonuses(0,0.1,0,0,0.05,0.25,0,0,0,0,0,0,0,0,0,0,0.15,0,0,0,0,0,0,0,0.15);
+		kaiApprentice.fightingStyle = fighting;
+		kaiApprentice.styleName = "Kai_Style";
+  	kaiApprentice.level = level-30;
+  	kaiApprentice.image = "https://cdn.discordapp.com/attachments/986234335051018340/989268135527989318/unknown.png";
+		kaiApprentice.setPersonality("Healer");
+		kaiApprentice.addTechnique(45, 'NPC');
+		kaiApprentice.addTechnique(36, 'NPC');
+		kaiApprentice.addTechnique(37, 'NPC');
+		kaiApprentice.addTechnique(46, 'NPC');
+		kaiApprentice.addTechnique(42, 'NPC'); 
+		kaiApprentice.setTransformation(33, 'NPC');
+
+		equipThing = new AttributeBonus("Apprentices's_Dogi","Dogi")
+		equipThing.loadBonuses(0,0,0.20,0,0,0.09,0,0,0,0,0,0,0,0,0,0.08,0.12,0,0,0,0,0,0,0,0.17);
+		let dogi = new Equipment(-1, [equipThing,4], "Dogi");
+		kaiApprentice.dogi = dogi;
+		kaiApprentice.statusUpdate(0);
+
+		attr = new Attributes(140,300,150,140,90,180);
+  	let kaiAttendant = new Character("Kaioshin's_Attendant",new Races("Core_Person"),attr,"Random");
+		fighting = new AttributeBonus("Core_Style","Fighting Style");
+		fighting.loadBonuses(0,0.3,0.1,0,0,0.1,0,0,0,0,0,0,0,0,0,0.1,0,0.3,0,0,0,0,0,0.1,0);
+		kaiAttendant.fightingStyle = fighting;
+		kaiAttendant.styleName = "Core_Style";
+  	kaiAttendant.level = level;
+  	kaiAttendant.image = "https://cdn.discordapp.com/attachments/986234335051018340/989265767402995752/unknown.png";
+		kaiAttendant.setPersonality("Tank");
+		kaiAttendant.addTechnique(45, 'NPC');
+		kaiAttendant.addTechnique(47, 'NPC');
+		kaiAttendant.addTechnique(42, 'NPC'); 
+		kaiAttendant.addTechnique(27, 'NPC'); 
+		kaiAttendant.addTechnique(32, 'NPC'); 
+		kaiAttendant.setTransformation(33, 'NPC');
+
+		equipThing = new AttributeBonus("Assistant's_Dogi","Dogi")
+		equipThing.loadBonuses(0,0.12,0.22,0.17,0,0,0,0,0,0,0,0,0,0,0,0,0,0.2,0,0.15,0.15,0,0,0.1,0);
+		dogi = new Equipment(-1,[equipThing,5], "Dogi");
+		kaiAttendant.dogi = dogi;
+		kaiAttendant.statusUpdate(0);
+
+		let party = new Party(kaioshin,"Trial");
+		party.partyList.push(kaiApprentice);
+		party.partyList.push(kaiAttendant);
+
+		let gohanClone = Gohan.clone();
+		gohanClone.level = level;
+		gohanClone = Raid.scaleStats(gohanClone,kaioshin.attributes.stotal*1.05);
+
+
+		//[char,gohanClone]
+		let trial = new Battle([char,gohanClone],party.partyList,ID,techList);
+		trial.raid = 2;
+		trial.expMod = 1.5;
+		if(char.potentialUnleashed === 0) {
+			trial.expMod += 0.5;
+			trial.itemBox = "Legendary";
+		}
+		else trial.itemBox = "Epic";
+
+		return trial;
+	}
 
 	broly(npcList, techList, party) { 
 		let attr = new Attributes(65,45,60,55,85,100);

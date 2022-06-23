@@ -793,11 +793,44 @@ class AttributeBonus {
 			this.blockRate = 0;
 			this.blockPower = 0;
 
-			this.pDefense = 0.1;
-			this.eDefense = 0.1;
+			this.pDefense = 0.2;
+			this.eDefense = 0.2;
 
 			this.magicPower = -1;
 			this.magicDefense = -0.25;
+	      
+	        this.physicalAttack = 0.1;
+	        this.energyAttack = 0.1;
+		}
+		else if(name === "Core_Person") {
+			this.bstr = 0;
+			this.bdex = 0;
+			this.bcon = 0;
+			this.beng = 0;
+			this.bsol = 0;
+			this.bfoc = 0;
+
+	        this.chargeBonus = 0;
+
+			this.health = 0;
+			this.energy = 0;
+			this.healthRegen = 0;
+			this.energyRegen = 0;
+			this.charge = 0.3;
+
+			this.hit = 0.1;
+			this.dodge = 0;
+			this.speed = 0;
+	        this.critRate = 0;
+	        this.critDamage = 0.1;
+			this.blockRate = 0;
+			this.blockPower = 0;
+
+			this.pDefense = 0;
+			this.eDefense = 0;
+
+			this.magicPower = 0.2;
+			this.magicDefense = 0.5;
 	      
 	        this.physicalAttack = 0;
 	        this.energyAttack = 0;

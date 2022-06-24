@@ -108,7 +108,7 @@ class Character {
 
     char.party = this.party;
     char.potentialUnlocked = this.potentialUnlocked;
-    char.potentialUnleashed = this.potentialUnleashed;
+    char.potentialUnlocked = this.potentialUnleashed;
 
     /**********
     Equipment

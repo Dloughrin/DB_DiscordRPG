@@ -265,8 +265,8 @@ class Help {
 		}
 		else if(choice === "Basic Stats") { 
 			if(topic === "Str") {
-				let str = "**Main Contributor For:** *Physical Attack, Block Rate, Block Power, Max Charge*"
-				str = str + "\n**Partial Contributor For:** *Crit Damage, Physical Defense, Energy Defense*"
+				let str = "**Main Contributor For:** *Physical Attack, Block Rate, Max Charge*"
+				str = str + "\n**Partial Contributor For:** *Crit Damage, Block Power, Physical Defense, Energy Defense*"
 				str = str + "\n**Str** is an important stat for both physical damage dealers, and tanks. It has a good balance of offensive and defensive boosts."
 				return [str,null];
 			}
@@ -277,8 +277,8 @@ class Help {
 				return [str,null];
 			}
 			else if(topic === "Con") {
-				let str = "**Main Contributor For:** *Health, Health Regen, Physical Defense*"
-				str = str + "\n**Partial Contributor For:** *Block Power*"
+				let str = "**Main Contributor For:** *Health, Health Regen, Block Power, Physical Defense*"
+				str = str + "\n**Partial Contributor For:** *Max Charge*"
 				str = str + "\n**Con** is an essential stat for every build, though the amount each character takes depends on their overall needs.*"
 				return [str,null];
 			}
@@ -290,7 +290,7 @@ class Help {
 			}
 			else if(topic === "Foc") {
 				let str = "**Main Contributor For:** *Hit Rate, Crit Damage, Magic Power*"
-				str = str + "\n**Partial Contributor For:** *Max Charge, Energy Attack, Physical Defense, Energy Defense, Speed, Dodge, Crit Rate*"
+				str = str + "\n**Partial Contributor For:** *Max Charge, Energy Attack, Physical Defense, Energy Defense, Speed, Dodge, Block Rate, Crit Rate*"
 				str = str + "\n**Foc** is the most versatile stat in the game, though the bonuses it gives are small in most cases. Most characters will want at least partial investment in Foc in case they go up against high dodge enemies."
 				return [str,null];
 			}
@@ -319,7 +319,7 @@ class Help {
 				return [str,null];
 			}
 			else if(topic === "Charge") {
-				let str = "A measurement of how much Ki a character can use to empower themselves."
+				let str = "A measurement of how much Ki a character can use to empower themselves. Charge stacks are multiplied by charge bonus before being applied to increase many of the other advanced stats in battle."
 				return [str,null];
 			}
 			else if(topic === "Charge Bonus") {
@@ -327,11 +327,11 @@ class Help {
 				return [str,null];
 			}
 			else if(topic === "Hit Rate") {
-				let str = "How accurate a character is. This stat reduces the likelyhood a character is to evade an attack, and if your accuracy is higher than the enemy's dodge, it also reduces block chance."
+				let str = "How accurate a character is. This stat reduces the likelyhood a character is to evade an attack."
 				return [str,null];
 			}
 			else if(topic === "Dodge Rate") {
-				let str = "How good a character is at evading attacks. High dodge rates prevent block rate from being lowered."
+				let str = "How good a character is at evading attacks."
 				return [str,null];
 			}
 			else if(topic === "Speed") {

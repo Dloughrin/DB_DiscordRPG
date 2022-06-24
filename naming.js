@@ -127,8 +127,8 @@ class Naming {
 	}
 
 	formName() {
-		let a = Math.round(Math.random() * (this.adjectives.length)-1);
-		let n = Math.round(Math.random() * (this.nouns.length)-1);
+		let a = Math.floor(Math.random() * this.adjectives.length);
+		let n = Math.floor(Math.random() * this.nouns.length);
 		if(a < 0) a = 0;
 		else if(a >= this.adjectives.length) a = this.adjectives.length-1;
 		if(n < 0) n = 0;
@@ -137,10 +137,10 @@ class Naming {
 	}
 
 	generateWeapon() {
-		let pre = Math.round(Math.random() * (this.professions.length)-1);
+		let pre = Math.floor(Math.random() * this.professions.length);
 		if(pre<0) pre = 0;
 		else if(pre>=this.professions.length) pre = this.professions.length-1;
-		let type = Math.round(Math.random() * (this.weapons.length)-1);
+		let type = Math.floor(Math.random() * this.weapons.length);
 		if(type<0) type = 0;
 		else if(type>=this.weapons.length) type = this.weapons.length-1;
 
@@ -148,7 +148,7 @@ class Naming {
 		let attr = new AttributeBonus(name,"Weapon");
 		let weapon = this.weaponAffix(type,attr);
 
-		let a = Math.round(Math.random()*(this.lengths.length-1));
+		let a = Math.floor(Math.random()*this.lengths.length);
 		if(a<0) a = 0;
 		else if(a>=this.lengths.length) a = this.lengths.length-1;
 		let affixes = this.lengths[a];
@@ -160,7 +160,7 @@ class Naming {
 		for(let i = 0; i < affixes; i++) {
 			let baseVal = 0.04;
 			baseVal += 0.01*Math.floor(affixes/2);
-			let pick = Math.round(Math.random()*4);
+			let pick = Math.floor(Math.random()*5);
 			let affix = baseVal + Math.random()*(0.06+0.01*(affixes - Math.floor(affixes/2)));
 			if(pick<0) pick = 0;
 
@@ -204,10 +204,10 @@ class Naming {
 	}
 
 	generateArmor() {
-		let pre = Math.round(Math.random() * (this.professions.length)-1);
+		let pre = Math.floor(Math.random() * (this.professions.length));
 		if(pre<0) pre = 0;
 		else if(pre>=this.professions.length) pre = this.professions.length-1;
-		let type = Math.round(Math.random() * (this.armors.length)-1);
+		let type = Math.floor(Math.random() * (this.armors.length));
 		if(type<0) type = 0;
 		else if(type>=this.armors.length) type = this.armors.length-1;
 
@@ -215,7 +215,7 @@ class Naming {
 		let attr = new AttributeBonus(name,"Dogi");
 		let armor = this.armorAffix(type,attr);
 
-		let a = Math.round(Math.random()*(this.lengths.length-1));
+		let a = Math.floor(Math.random()*(this.lengths.length));
 		if(a<0) a = 0;
 		else if(a>=this.lengths.length) a = lengths.length-1;
 		let affixes = this.lengths[a];
@@ -227,7 +227,7 @@ class Naming {
 		for(let i = 0; i < affixes; i++) {
 			let baseVal = 0.04;
 			baseVal += 0.01*Math.floor(affixes/2);
-			let pick = Math.round(Math.random()*4);
+			let pick = Math.floor(Math.random()*6);
 			let affix = baseVal + Math.random()*(0.06+0.01*(affixes - Math.floor(affixes/2)));
 			if(pick<0) pick = 0;
 
@@ -258,18 +258,13 @@ class Naming {
 				affix = baseVal + Math.random()*0.06;
 				attr.energyRegen += affix*0.55;
 			}
-			else if(pick === 6) {
-				attr.health += affix*0.3;
-				affix = baseVal + Math.random()*0.06;
-				attr.energy += affix*0.3;
-			}
 		}
 
 		return [attr,affixes];
 	}
 
 	specialAffix(prefix,attr) {
-		let pick = Math.round(Math.random()*3)-1;
+		let pick = Math.floor(Math.random()*3);
 		let affix = 0.06 + Math.random()*0.09;
 		if(pick<0) pick = 0;
 

@@ -134,15 +134,28 @@ class Battle {
 
           target = -1;
           targets = new Array();
+          let healerI = -1;
+          let tHP = -1;
+          let restoreI = -1;
+          let tEP = -1;
           for(let z = 0; z < this.pCombatants.length; z++) {
             let priority = 5*this.pCombatants[z].battleMaxAtt.health/(1+this.pCombatants[z].battleCurrAtt.health) + this.pCombatants[z].battleMaxAtt.energy/(1+this.pCombatants[z].battleCurrAtt.energy);
-            if(this.pCombatants[z].personality !== "Healer") {
-              priority *= (this.pCombatants[z].battleCurrAtt.stotal+this.pCombatants[z].level)/2;
+            priority *= (this.pCombatants[z].battleCurrAtt.stotal+this.pCombatants[z].level)/2;
+            if(this.pCombatants[i].personality == "Healer") { 
+              if(tHP == -1 || this.pCombatants[z].battleCurrAtt.health/this.pCombatants[z].battleMaxAtt.health < tHP) {
+                tHP = this.pCombatants[z].battleCurrAtt.health/this.pCombatants[z].battleMaxAtt.health;
+                healerI = z;
+              }
+              if(tEP == -1 || this.pCombatants[z].battleCurrAtt.energy/this.pCombatants[z].battleMaxAtt.energy < tEP) {
+                tEP = this.pCombatants[z].battleCurrAtt.energy/this.pCombatants[z].battleMaxAtt.energy;
+                restoreI = z;
+              }
             }
-            else priority *= 2*this.pCombatants[z].battleMaxAtt.health/(1+2*this.pCombatants[z].battleCurrAtt.health)*(this.pCombatants[z].battleCurrAtt.stotal/6+this.pCombatants[z].level/4);
             if(this.pCombatants[i].name+this.pCombatants[i].playerID === this.pCombatants[z].name+this.pCombatants[z].playerID) priority = priority*0.85;
             targets.push([z,priority]);
           }
+          if(this.pCombatants[i].personality == "Healer" && healerI !== -1 && tHP <= 0.75) targets[healerI] *= 50;
+          else if(this.pCombatants[i].personality == "Healer" && healerI !== -1 && tEP <= 0.75) targets[restoreI] *= 50;
           targets.sort(function(a,b) {return b[1] - a[1]});
           ind = 0;
           while(target === -1) {
@@ -197,12 +210,28 @@ class Battle {
 
           target = -1;
           targets = new Array();
+          let healerI = -1;
+          let tHP = -1;
+          let restoreI = -1;
+          let tEP = -1;
           for(let z = 0; z < this.NPCombatants.length; z++) {
             let priority = 5*this.NPCombatants[z].battleMaxAtt.health/(1+this.NPCombatants[z].battleCurrAtt.health) + this.NPCombatants[z].battleMaxAtt.energy/(1+this.NPCombatants[z].battleCurrAtt.energy);
             priority *= (this.NPCombatants[z].battleCurrAtt.stotal+this.NPCombatants[z].level)/2;
+            if(this.NPCombatants[i].personality == "Healer") {
+              if(tHP == -1 || this.NPCombatants[z].battleCurrAtt.health/this.NPCombatants[z].battleMaxAtt.health < tHP) {
+                tHP = this.NPCombatants[z].battleCurrAtt.health/this.NPCombatants[z].battleMaxAtt.health;
+                healerI = z;
+              }
+              if(tEP == -1 || this.NPCombatants[z].battleCurrAtt.energy/this.NPCombatants[z].battleMaxAtt.energy < tEP) {
+                tEP = this.NPCombatants[z].battleCurrAtt.energy/this.NPCombatants[z].battleMaxAtt.energy;
+                restoreI = z;
+              }
+            }
             if(this.NPCombatants[i].name+this.NPCombatants[i].playerID === this.NPCombatants[z].name+this.NPCombatants[z].playerID) priority = priority*0.85;
             targets.push([z,priority]);
           }
+          if(this.NPCombatants[i].personality == "Healer" && healerI !== -1 && tHP <= 0.75) targets[healerI] *= 50;
+          else if(this.NPCombatants[i].personality == "Healer" && restoreI !== -1 && tEP <= 0.75) targets[restoreI] *= 50;
           targets.sort(function(a,b) {return b[1] - a[1]});
           ind = 0;
           while(target === -1) {
@@ -265,7 +294,7 @@ class Battle {
         choices[8][1] += 2;
       }
 
-      if(target.battleCurrAtt.blockRate > 80) {
+      if(target.battleCurrAtt.blockRate > 50) {
         let nphys = this.defenseCalc(phys, target.battleCurrAtt.blockPower);
         let nenergy = this.defenseCalc(0.8*energy, target.battleCurrAtt.blockPower);
         if(nphys*2 < target.battleCurrAtt.health*0.1) {
@@ -384,38 +413,35 @@ class Battle {
           else if(this.techList[techPref[i][0]].techType === "Restoration") {
             techPref[i][1] += Number(choices[8][1]);
 
-            if(ally.battleCurrAtt.energy < ally.battleMaxAtt.energy*0.25 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 4;
-            else if(ally.battleCurrAtt.energy < ally.battleMaxAtt.energy*0.5 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 2;
-            else if(ally.battleCurrAtt.energy < ally.battleMaxAtt.energy*0.66 && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += 1;
+            if(ally.battleCurrAtt.energy < ally.battleMaxAtt.energy && this.techList[techPref[i][0]].energy != 0) techPref[i][1] += Math.round(5*(ally.battleMaxAtt.energy-ally.battleCurrAtt.energy)/ally.battleMaxAtt.energy);
             else techPref[i][1] -= 4;
-            if(this.techList[techPref[i][0]].energy != 0) techPref[i][1] -= 6;
+            if(this.techList[techPref[i][0]].energy != 0) techPref[i][1] -= 4;
 
-            if(ally.battleCurrAtt.health < ally.battleMaxAtt.health*0.25 && this.techList[techPref[i][0]].health != 0) techPref[i][1] += 5;
-            else if(ally.battleCurrAtt.health < ally.battleMaxAtt.health*0.5 && this.techList[techPref[i][0]].health != 0) techPref[i][1] += 2;
+            if(ally.battleCurrAtt.health < ally.battleMaxAtt.health && this.techList[techPref[i][0]].health != 0) techPref[i][1] += Math.round(8*(ally.battleMaxAtt.health-ally.battleCurrAtt.health)/ally.battleMaxAtt.health);
             else techPref[i][1] -= 4;
-            if(this.techList[techPref[i][0]].health != 0) techPref[i][1] -= 6;
+            if(this.techList[techPref[i][0]].health != 0) techPref[i][1] -= 4;
           }
 
           if(this.techList[techPref[i][0]].energyCost*scaler*2 >= npc.battleCurrAtt.energy || this.techList[techPref[i][0]].healthCost*scaler*3 >= npc.battleCurrAtt.health) {
             techPref[i][1] -= 100;
           }
           else if(this.techList[techPref[i][0]].techType === "Ki" || this.techList[techPref[i][0]].techType === "Strike") {
-            if(this.techList[techPref[i][0]].techType === "Strike" && target.battleCurrAtt.blockRate >= 100 &&
-              target.battleCurrAtt.health*0.05 < this.techList[techPref[i][0]].hits*this.defenseCalc(phys+this.techList[techPref[i][0]].flatDamage*scaler, target.battleCurrAtt.blockPower)) {
+            if(this.techList[techPref[i][0]].techType === "Strike" && target.battleCurrAtt.blockRate >= 50 &&
+              target.battleCurrAtt.health*0.1 > this.techList[techPref[i][0]].hits*this.defenseCalc(phys+this.techList[techPref[i][0]].flatDamage*scaler, target.battleCurrAtt.blockPower)) {
               techPref[i][1] -= 5;
             }
-            else if(this.techList[techPref[i][0]].techType === "Ki" && target.battleCurrAtt.blockRate >= 100 &&
-              target.battleCurrAtt.health*0.05 < this.techList[techPref[i][0]].hits*this.defenseCalc(energy+this.techList[techPref[i][0]].flatDamage*scaler, target.battleCurrAtt.blockPower)) {
+            else if(this.techList[techPref[i][0]].techType === "Ki" && target.battleCurrAtt.blockRate >= 50 &&
+              target.battleCurrAtt.health*0.1 > this.techList[techPref[i][0]].hits*this.defenseCalc(energy+this.techList[techPref[i][0]].flatDamage*scaler, target.battleCurrAtt.blockPower)) {
               techPref[i][1] -= 5;
             }
-            techPref[i][1] += Math.round(Number(this.techList[techPref[i][0]].scalePercent));
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].flatDamage/40);
+            techPref[i][1] += Math.round(3*Number(this.techList[techPref[i][0]].scalePercent)/5);
+            techPref[i][1] += Math.round(this.techList[techPref[i][0]].flatDamage/50);
             if(npc.race.raceName === "Majin") techPref[i][1] -= Math.round(this.techList[techPref[i][0]].energyCost/75);
             techPref[i][1] -= Math.round(this.techList[techPref[i][0]].healthCost/50);
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].hitRate/25);
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].critRate/10);
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].armorPen/10);
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].hits/2);
+            techPref[i][1] += Math.round(2*this.techList[techPref[i][0]].hitRate/50);
+            techPref[i][1] += Math.round(3*this.techList[techPref[i][0]].critRate/50);
+            techPref[i][1] += Math.round(this.techList[techPref[i][0]].armorPen/25);
+            techPref[i][1] += Math.round(this.techList[techPref[i][0]].hits/2.5);
             if(this.techList[techPref[i][0]].allowCharge > 0) techPref[i][1] += 1;
           }
           else if(this.techList[techPref[i][0]].techType === "Buff" || this.techList[techPref[i][0]].techType === "Debuff") {
@@ -446,9 +472,9 @@ class Battle {
             }
           }
           else if(this.techList[techPref[i][0]].techType === "Restoration") {
-            techPref[i][1] += Math.round(Number(this.techList[techPref[i][0]].scalePercent));
-            techPref[i][1] += Math.round(this.techList[techPref[i][0]].flatDamage/30);
-            if(npc.race.raceName === "Majin") techPref[i][1] -= Math.round(this.techList[techPref[i][0]].energyCost/75);
+            techPref[i][1] += Math.round(Number(this.techList[techPref[i][0]].scalePercent)/4);
+            techPref[i][1] += Math.round(this.techList[techPref[i][0]].flatDamage/40);
+            if(npc.race.raceName === "Majin") techPref[i][1] -= Math.round(this.techList[techPref[i][0]].energyCost/50);
             techPref[i][1] -= Math.round(this.techList[techPref[i][0]].healthCost/50);
           }
           else {
@@ -502,10 +528,9 @@ class Battle {
           return ['a', this.skill(npc, ally, this.techList[chosenTech], 0)];
         }
         else {
-          if(npc.battleCurrAtt.charge < target.battleCurrAtt.charge*0.75) return ['e', this.skill(npc, target, this.techList[chosenTech], 0)];
-          else return ['e', this.skill(npc, target, this.techList[chosenTech], 1)];
+          if(npc.battleCurrAtt.charge > target.battleCurrAtt.charge*0.75 && npc.battleCurrAtt.charge >= npc.battleMaxAtt.charge*0.2*this.techList[chosenTech].allowCharge) return ['e', this.skill(npc, target, this.techList[chosenTech], 1)];
+          else return ['e', this.skill(npc, target, this.techList[chosenTech], 0)];
         }
-        
       }
     }
 
@@ -678,12 +703,7 @@ class Battle {
 
     strike(attacker, target) {
       //calc hits
-      let s = Math.round((1.45 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.9 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
-      if(s < 2) s = 2;
-      let strike = new Technique(-1, "Strike Rush", "Strike", 0, 0, 15, 0.8, s);
-      strike.hitRate = 0.15;
-      strike.armorPen = 0.15;
-      strike.critRate = 0.05;
+      let strike = this.setStrike(attacker, target);
       let out = this.skill(attacker, target, strike, 0);
       if(parseInt(out[0]) === 0) {
       }
@@ -698,12 +718,7 @@ class Battle {
 
     burst(attacker, target) {
       //calc hits
-      let s = Math.round((1.45 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.9 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
-      if(s < 3) s = 3;
-      let burst = new Technique(-1, "Ki Burst", "Ki", 0, 0, 15, 0.7, s);
-      burst.hitRate = 0.2;
-      burst.armorPen = 0.15;
-      burst.critRate = 0.05;
+      let burst = this.setBurst(attacker, target);
       let out = this.skill(attacker, target, burst, 0);
       if(parseInt(out[0]) === 0) {
       }
@@ -727,7 +742,6 @@ class Battle {
         let scaleLvl = Math.round((attacker.battleCurrAtt.stotal + attacker.level)/2);
         let calcHit = this.dodgeCalc((1+technique.hitRate/100)*attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus, target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus);
 
-        //here
         if(attacker.battleCurrAtt.health < technique.healthCost*scaleLvl || attacker.battleCurrAtt.energy < technique.energyCost*scaleLvl) {
           str = attacker.name.replace(/\_/g,' ') + ' can no longer use ' + technique.name.replace(/\_/g,' ') + ' on ' + target.name.replace(/\_/g,' ') + '!';
           return [0,str];
@@ -781,10 +795,12 @@ class Battle {
         damage *= s;
         
         //block calculation
-        let dod1 = target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus;
-        let dod2 = attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus - 0.8*target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus;
+        /*let dod1 = target.battleCurrAtt.speed*target.battleCurrAtt.chargeBonus;
+        let dod2 = attacker.battleCurrAtt.speed*attacker.battleCurrAtt.chargeBonus - 0.8*target.battleCurrAtt.speed*target.battleCurrAtt.chargeBonus;
         let adjustment = Math.min(1.1,Math.max(0,dod2/dod1))*100;
-        if(block <= (target.battleCurrAtt.blockRate - adjustment)) {
+        console.log('block: ' + block + ' <= ' + target.battleCurrAtt.blockRate)
+        console.log('adjusted block: ' + block + ' <= ' + (target.battleCurrAtt.blockRate - adjustment))*/
+        if(block <= (target.battleCurrAtt.blockRate)) {
           str = str + '\n' + target.name.replace(/\_/g,' ') + ' blocked!';
           let blockPow = target.battleCurrAtt.blockPower*target.battleCurrAtt.chargeBonus/Battle.blockModifier;
           damage = this.defenseCalc(damage,(1-technique.armorPen/100)*blockPow);
@@ -937,6 +953,108 @@ class Battle {
       let str = user.name.replace(/\_/g,' ') + " charges their energy."
       return [-1,str];
     }  
+
+    setBurst(attacker, target) { 
+      let s;
+      let burst;
+
+      //staff weapons
+      if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("staff") !== -1 || attacker.weapon.name.toLowerCase().search("stave") !== -1 || attacker.weapon.name.toLowerCase().search("cane") !== -1)) { 
+        s = Math.round((1.2 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.95 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 2) s = 2;
+        burst = new Technique(-1, "Ki Beam", "Ki", 0, 0, 20, 1, s);
+        burst.hitRate = 0.1;
+        burst.armorPen = 0.35;
+        burst.critRate = 0.05;
+      } //rod weapons
+      else if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("rod") !== -1 || attacker.weapon.name.toLowerCase().search("wand") !== -1 || attacker.weapon.name.toLowerCase().search("scepter") !== -1)) {
+        s = Math.round((1.25 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.95 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 2) s = 2;
+        burst = new Technique(-1, "Ki Ray", "Ki", 0, 0, 60, 0.8, s);
+        burst.hitRate = 0.15;
+        burst.armorPen = 0.25;
+        burst.critRate = 0.1;
+      }//firearm weapons
+      else if(attacker.weapon !== null && attacker.weapon.name.toLowerCase().search("gun") !== -1) {
+        s = Math.round((1.55 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.85 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 3) s = 3;
+        burst = new Technique(-1, "Ki Shot", "Ki", 0, 0, 75, 0.5, s);
+        burst.hitRate = 0.25;
+        burst.armorPen = 0.25;
+        burst.critRate = 0.1;
+      }//ki focus weapons
+      else if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("focus") !== -1 || attacker.weapon.name.toLowerCase().search("orb") !== -1)) {
+        s = Math.round((1.15 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 1) s = 1;
+        burst = new Technique(-1, "Ki Ball", "Ki", 0, 0, 5, 3, s);
+        burst.armorPen = 0.05;
+        burst.critRate = 0.05;
+      }//weapons without a category
+      else {
+        s = Math.round((1.45 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.9 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 3) s = 3;
+        burst = new Technique(-1, "Ki Burst", "Ki", 0, 0, 30, 0.7, s);
+        burst.hitRate = 0.2;
+        burst.armorPen = 0.15;
+        burst.critRate = 0.05;
+      }
+
+      return burst;
+    }
+
+    setStrike(attacker, target) {
+      let s;
+      let strike;
+
+      //Quick blades (Katana/dagger)
+      if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("katana") !== -1 || attacker.weapon.name.toLowerCase().search("dagger") !== -1 || attacker.weapon.name.toLowerCase().search("longsword") !== -1 || attacker.weapon.name.toLowerCase().search("shortsword") !== -1)) { 
+        let s = Math.round((1.6 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.85 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 1) s = 1;
+        strike = new Technique(-1, "Blade Rush", "Strike", 0, 0, 15, 0.9, s);
+        strike.hitRate = 0.15;
+        strike.armorPen = 0.10;
+        strike.critRate = 0.05;
+      } //Heavy blades (Greatswords/Axes)
+      else if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("greatsword") !== -1 || attacker.weapon.name.toLowerCase().search("axe") !== -1 || attacker.weapon.name.toLowerCase().search("scepter") !== -1)) {
+        let s = Math.round((0.85 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 1) s = 1;
+        strike = new Technique(-1, "Blade Crush", "Strike", 0, 0, 40, 2, s);
+        strike.hitRate = -0.15;
+        strike.armorPen = 0.25;
+        strike.critRate = -0.1;
+      } //Firearms
+      else if(attacker.weapon !== null && attacker.weapon.name.toLowerCase().search("gun") !== -1) {
+        let s = Math.round((1.15 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 1) s = 1;
+        strike = new Technique(-1, "Buttstroke", "Strike", 0, 0, 60, 1.3, s);
+        strike.armorPen = 0.25;
+      } //Polearms
+      else if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("polearm") !== -1 || attacker.weapon.name.toLowerCase().search("cane") !== -1 || attacker.weapon.name.toLowerCase().search("staff") !== -1 || attacker.weapon.name.toLowerCase().search("stave") !== -1)) {
+        let s = Math.round((1.35 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 4) s = 4;
+        strike = new Technique(-1, "Thrust Flurry", "Strike", 0, 0, 5, 0.5, s);
+        strike.hitRate = 0.05;
+        strike.armorPen = 0.05;
+      } //Wands/Focus (kicking)
+      else if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("focus") !== -1 || attacker.weapon.name.toLowerCase().search("orb") !== -1 || attacker.weapon.name.toLowerCase().search("rod") !== -1 || attacker.weapon.name.toLowerCase().search("wand") !== -1 || attacker.weapon.name.toLowerCase().search("scepter") !== -1)) {
+        let s = Math.round((1.15 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.8 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 2) s = 2;
+        strike = new Technique(-1, "Kicking Flurry", "Strike", 0, 0, 70, 0.6, s);
+        strike.hitRate = 0.15;
+        strike.armorPen = 0;
+        strike.critRate = 0.05;
+      } //No category (Punching)
+      else {
+        let s = Math.round((1.45 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.9 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        if(s < 2) s = 2;
+        strike = new Technique(-1, "Strike Rush", "Strike", 0, 0, 15, 0.8, s);
+        strike.hitRate = 0.15;
+        strike.armorPen = 0.15;
+        strike.critRate = 0.05;
+      }
+
+      return strike;
+    }
 }
 
 module.exports = {

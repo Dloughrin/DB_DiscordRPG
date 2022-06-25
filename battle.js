@@ -116,7 +116,7 @@ class Battle {
         else if(pCombPC > this.actions.length || NPCombPC > this.NPCactions.length) {
         }
         else if(this.pCombatants[i].playerID === "NPC" || this.pCombatants[i].playerID === "Random" ) {
-          let target = -1;
+          /*let target = -1;
           let targets = new Array();
           for(let z = 0; z < this.NPCombatants.length; z++) {
             targets.push([z,this.NPCombatants[z].battleCurrAtt.con+this.NPCombatants[z].battleCurrAtt.eng/2+this.NPCombatants[z].battleCurrAtt.stotal/15+this.NPCombatants[z].level/20]);
@@ -165,9 +165,9 @@ class Battle {
               ind++;
             }
           }
-          this.pCombatants[i].aTarget = target;
+          this.pCombatants[i].aTarget = target;*/
 
-          let aiChoice = this.AI(this.pCombatants[i].personality, this.pCombatants[i],this.NPCombatants[this.pCombatants[i].eTarget],this.pCombatants[this.pCombatants[i].aTarget]);
+          let aiChoice = this.nAI(this.pCombatants[i].personality, this.pCombatants[i],this.NPCombatants,this.pCombatants);
           let action = aiChoice[1];
           action.push(i);
           if(aiChoice[0] === 'e') {
@@ -192,7 +192,7 @@ class Battle {
         else if(NPCombPC > this.NPCactions.length || pCombPC > this.actions.length) {
         }
         else if(this.NPCombatants[i].playerID === "NPC" || this.NPCombatants[i].playerID === "Random" ) {
-          let target = -1;
+          /*let target = -1;
           let targets = new Array();
           for(let z = 0; z < this.pCombatants.length; z++) {
             targets.push([z,this.pCombatants[z].battleCurrAtt.con+this.pCombatants[z].battleCurrAtt.eng/2+this.pCombatants[z].battleCurrAtt.stotal/15+this.pCombatants[z].level/20]);
@@ -241,9 +241,9 @@ class Battle {
               ind++;
             }
           }
-          this.NPCombatants[i].aTarget = target;
+          this.NPCombatants[i].aTarget = target;*/
 
-          let aiChoice = this.AI(this.NPCombatants[i].personality, this.NPCombatants[i],this.pCombatants[this.NPCombatants[i].eTarget],this.NPCombatants[this.NPCombatants[i].aTarget]);
+          let aiChoice = this.nAI(this.NPCombatants[i].personality, this.NPCombatants[i],this.pCombatants,this.NPCombatants);
           let action = aiChoice[1];
           action.push(i);
           if(aiChoice[0] === 'e') {
@@ -261,6 +261,293 @@ class Battle {
       }
       if(this.NPCombatants.length <= (this.NPCactions.length + deadJ) && (this.pCombatants.length <= (this.actions.length + deadI))) return 1;
       else return 0;
+    }
+
+    nAI(personality, npc, enemies, party) {
+      let choices = new Array();
+      let techPref = new Array();
+      choices.push(["Strike",Number(personality[0])]); //strike
+      choices.push(["Burst",Number(personality[1])]); //burst
+      choices.push(["Charge",Number(personality[2])]); //charge
+      choices.push(["Transform",Number(personality[3])]); //transform
+      choices.push(["Strike Tech",Number(personality[4])]); //strike technique
+      choices.push(["Ki Tech",Number(personality[5])]); //ki technique
+      choices.push(["Buff",Number(personality[6])]); //buff technique
+      choices.push(["Debuff",Number(personality[7])]); //debuff technique
+      choices.push(["Restoration",Number(personality[8])]); //healing technique
+
+
+      if(npc.battleCurrAtt.charge === npc.battleMaxAtt.charge) {
+        choices[2][1] -= 5;
+      }
+      else if(npc.battleCurrAtt.charge < npc.battleMaxAtt.charge*0.60) {
+        choices[2][1] += 3;
+      }
+      else if(npc.battleCurrAtt.charge < npc.battleMaxAtt.charge*0.80) {
+        choices[2][1] += 1;
+      }
+      else choices[2][1] -= 2
+
+      if(npc.transformation === -1 || npc.isTransformed != -1) {
+        choices[3][1] -= 100;
+      }
+      else {
+        choices[3][1] += 2*Math.round(this.techList[npc.transformation].attBonus.getTotalChange()/100);
+      }
+
+      let chosenTech = null;
+      let scaler = Math.round((npc.level+npc.battleCurrAtt.stotal)/2);
+      if(npc.techniques.length === 0) {
+        choices[4][1] -= 100;
+        choices[5][1] -= 100;
+        choices[6][1] -= 100;
+        choices[7][1] -= 100;
+        choices[8][1] -= 100;
+      }
+      else {
+        let attacks = new Array();
+        let buffs = new Array();
+        let debuffs = new Array();
+        let heals = new Array();
+
+        for(let i = 0; i < npc.techniques.length; i++) {
+          if(npc.techCooldowns[i] !== 0)  { }
+          else if(this.techList[npc.techniques[i]].techType === "Buff") {
+            if(scaler*this.techList[npc.techniques[i]].energyCost <= npc.battleCurrAtt.energy &&
+              scaler*this.techList[npc.techniques[i]].healthCost <= npc.battleCurrAtt.health) { buffs.push(this.techList[npc.techniques[i]]); }
+          }
+          else if(this.techList[npc.techniques[i]].techType === "Debuff") {
+            if(scaler*this.techList[npc.techniques[i]].energyCost <= npc.battleCurrAtt.energy &&
+              scaler*this.techList[npc.techniques[i]].healthCost <= npc.battleCurrAtt.health) { debuffs.push(this.techList[npc.techniques[i]]); }
+          }
+          else if(this.techList[npc.techniques[i]].techType === "Restoration") {
+            if(scaler*this.techList[npc.techniques[i]].energyCost <= npc.battleCurrAtt.energy &&
+              scaler*this.techList[npc.techniques[i]].healthCost <= npc.battleCurrAtt.health) { heals.push(this.techList[npc.techniques[i]]); }
+          }
+          else if(this.techList[npc.techniques[i]].techType === "Ki" || this.techList[npc.techniques[i]].techType === "Strike") {
+            if(scaler*this.techList[npc.techniques[i]].energyCost <= npc.battleCurrAtt.energy &&
+              scaler*this.techList[npc.techniques[i]].healthCost <= npc.battleCurrAtt.health) { attacks.push(this.techList[npc.techniques[i]]); }
+          }
+        }
+
+        let topPrio = new Array();
+        for(let i = 0; i < enemies.length; i++) {
+          if(enemies[i].battleCurrAtt.health <= 0) continue;
+          else if(npc.battleCurrAtt.charge/npc.battleMaxAtt.charge < enemies[i].battleCurrAtt.charge/enemies[i].battleMaxAtt.charge) choices[2][1] += 1;
+
+          let threat = (enemies[i].battleCurrAtt.stotal+enemies[i].battleCurrAtt.con+enemies[i].level) / (npc.battleCurrAtt.stotal+npc.level)
+
+          let choiceMods = new Array();
+          for(let j = 0; j < choices.length; j++) choiceMods.push(choices[j]);
+          let aprio = new Array();
+
+          for(let j = 0; j < attacks.length; j++) {
+            //index, priority(damage), type, target
+            let dam = this.quickCalc(npc,enemies[i],attacks[j]);
+            if(attacks[j].energyCost > 0) dam *= (npc.battleCurrAtt.energy-scaler*attacks[j].energyCost*0.9)/npc.battleCurrAtt.energy;
+            if(attacks[j].healthCost > 0) dam *= (npc.battleCurrAtt.energy-scaler*attacks[j].healthCost*1.5)/npc.battleCurrAtt.health;
+            dam *= threat;
+            if(attacks[j].techType == "Ki") aprio.push([j,dam,"Ki Tech",i]);
+            else aprio.push([j,this.quickCalc(npc,enemies[i],attacks[j]),"Strike Tech",i]);
+          }
+          let dam = this.quickCalc(npc,enemies[i],this.setBurst(npc, enemies[i]))
+          dam *= threat;
+          aprio.push([-1,dam,"Burst",i]);
+          dam = this.quickCalc(npc,enemies[i],this.setStrike(npc, enemies[i]));
+          dam *= threat;
+          aprio.push([-2,dam,"Strike",i]);
+          aprio.sort(function(a,b) {return b[1] - a[1]});
+          aprio = aprio[0];
+
+          let debuffprio = new Array();
+          for(let j = 0; j < debuffs.length; j++) {
+            //index, priority, type, target
+            let change = debuffs[j].attBonus.getTotalChange()
+            if(debuffs[j].energyCost > 0) change *= (npc.battleCurrAtt.energy-scaler*debuffs[j].energyCost*0.9)/npc.battleCurrAtt.energy;
+            if(debuffs[j].healthCost > 0) change *= (npc.battleCurrAtt.energy-scaler*debuffs[j].healthCost*1.5)/npc.battleCurrAtt.health;
+            change *= (1 - this.defenseCalc(1, enemies[i].battleCurrAtt.magicDefense));
+            change *= debuffs[j].duration/5;
+            change *= threat;
+            debuffprio.push([j,change,"Debuff",i])
+          }
+
+          if(debuffprio.length === 0) {
+            choices[7][1] -= 100;
+            topPrio.push(aprio);
+          }
+          else {
+            debuffprio.sort(function(a,b) {return b[1] - a[1]});
+            debuffprio = debuffprio[0];
+
+            if(aprio[2] === "Burst") {
+              if(choiceMods[7][1] > choiceMods[1][1]) topPrio.push(debuffprio);
+              else topPrio.push(aprio);
+            }
+            else if(aprio[2] === "Strike") {
+              if(choiceMods[7][1] > choiceMods[0][1]) topPrio.push(debuffprio);
+              else topPrio.push(aprio);
+            }
+            else if(attacks[aprio[0]].techType === "Ki") {
+              if(choiceMods[7][1] > choiceMods[5][1]) topPrio.push(debuffprio);
+              else topPrio.push(aprio);
+            }
+            else {
+              if(choiceMods[7][1] > choiceMods[4][1]) topPrio.push(debuffprio);
+              else topPrio.push(aprio);
+            }
+          }
+        }
+
+        let highestRecover = 0;
+        for(let i = 0; i < party.length; i++) {
+          if(party[i].battleCurrAtt.health <= 0) continue;
+          if(heals.length === 0 && buffs.length === 0) {
+            choices[6][1] -= 100;
+            choices[8][1] -= 100;
+            break;
+          }
+
+          let choiceMods = new Array();
+          for(let j = 0; j < choices.length; j++) choiceMods.push(choices[j]);
+          let healprio = new Array();
+
+          for(let j = 0; j < heals.length; j++) {
+            //index, priority(healing), type, target
+            let heal = (npc.battleCurrAtt.magicPower+heals[j].flatDamage)*heals[j].scalePercent;
+            let healmod = 1;
+            if(parseInt(heals[j].health) == 1) healmod *= ((party[i].battleMaxAtt.health-party[i].battleCurrAtt.health)/party[i].battleMaxAtt.health);
+            if(parseInt(heals[j].energy) == 1) healmod *= 0.7*((party[i].battleMaxAtt.energy-party[i].battleCurrAtt.energy)/party[i].battleMaxAtt.energy);
+            if(healmod > highestRecover) highestRecover = healmod;
+            heal *= healmod;
+            if(heals[j].energyCost > 0) heal *= (npc.battleCurrAtt.energy-scaler*heals[j].energyCost*0.8)/npc.battleCurrAtt.energy;
+            if(heals[j].healthCost > 0) heal *= (npc.battleCurrAtt.energy-scaler*heals[j].healthCost*1.5)/npc.battleCurrAtt.health;
+            if(npc.personality !== "Support" || npc.personality !== "Healer" &&
+               npc.name+npc.playerID === party[i].name+party[i].playerID) {
+              heal *= 1.5;
+            }
+            else if(npc.name+npc.playerID === party[i].name+party[i].playerID) heal *= 0.75;
+            if(heal > 0) healprio.push([j,heal,"Restoration",i]);
+          }
+
+          let buffprio = new Array();
+          for(let j = 0; j < buffs.length; j++) {
+            //index, priority, type, target
+            let change = buffs[j].attBonus.getTotalChange();
+            if(buffs[j].energyCost > 0) change *= (npc.battleCurrAtt.energy-scaler*buffs[j].energyCost*0.9)/npc.battleCurrAtt.energy;
+            if(buffs[j].healthCost > 0) change *= (npc.battleCurrAtt.energy-scaler*buffs[j].healthCost*1.5)/npc.battleCurrAtt.health;
+            change *= buffs[j].duration/5;
+            if(npc.personality !== "Support" || npc.personality !== "Healer" &&
+               npc.name+npc.playerID === party[i].name+party[i].playerID) {
+              change *= 1.5;
+            }
+            else if(npc.name+npc.playerID === party[i].name+party[i].playerID) change *= 0.75;
+            if(buffs[j].guardTarget !== 0 && npc.personality == "Tank" && npc.name+npc.playerID !== party[i].name+party[i].playerID) {
+              change *= 2;
+              choices[6][1] += 1;
+            }
+            buffprio.push([j,change,"Buff",i])
+          }
+          if(buffprio.length !== 0) {
+            buffprio.sort(function(a,b) {return b[1] - a[1]});
+            buffprio = buffprio[0];
+          }
+          if(healprio.length !== 0) {
+            healprio.sort(function(a,b) {return b[1] - a[1]});
+            healprio = healprio[0];
+          }
+
+          if(buffprio.length === 0) {
+            topPrio.push(healprio);
+          }
+          else if(healprio === 0) {
+            topPrio.push(buffprio);
+          }
+          else {
+            if(choiceMods[6][1] > choiceMods[8][1]) topPrio.push(buffprio);
+            else topPrio.push(healprio);
+          }
+        }
+        if(highestRecover > 0) choices[8][1] += Math.floor(7*(highestRecover-0.33));
+        else choices[8][1] -= 5;
+
+        if(highestRecover < 0.15) choices[8][1] -= 2;
+
+        choices.sort(function(a,b) {return b[1] - a[1]});
+        if(choices[0][0] === "Charge" || choices[0][0] === "Transform") {
+          if(choices[0][0] === "Charge") {
+            return [-1, this.charge(npc)];
+          }
+          else if(choices[0][0] === "Transform") {
+            return [-2, this.transform(npc)];
+          }
+        }
+        else {
+          let choice = null;
+          topPrio.sort(function(a,b) {return b[1] - a[1]});
+          for(let i = 0; i < choices.length; i++) {
+            for(let j = 0; j < topPrio.length; j++) {
+              let compareC = choices[i][0];
+              let compareP = topPrio[j][2];
+              if(compareC == "Ki Tech" || compareC == "Strike Tech" || compareC == "Strike" || compareC == "Burst") compareC = "Attack";
+              if(compareP == "Ki Tech" || compareP == "Strike Tech" || compareP == "Strike" || compareP == "Burst") compareP = "Attack";
+              if(compareP == compareC) {
+                choice = topPrio[j];
+                break;
+              }
+            }
+            if(choice !== null) break;
+          }
+
+          if(choice[2] === "Restoration" || choice[2] === "Buff") {
+            npc.aTarget = choice[3];
+            if(choice[2] === "Buff") {
+              return ['a', this.skill(npc, party[choice[3]], buffs[choice[0]], 0)];
+            }
+            else {
+              return ['a', this.skill(npc, party[choice[3]], heals[choice[0]], 0)];
+            }
+          }
+          else {
+            npc.eTarget = choice[3];
+            if(choice[2] === "Strike" || choice[0] == -2) {
+              return ['e', this.strike(npc, enemies[choice[3]])];
+            }
+            else if(choice[2] === "Burst" || choice[0] == -1) {
+              return ['e', this.burst(npc, enemies[choice[3]])];
+            }
+            else if(choice[2] === "Debuff") {
+              return ['e', this.skill(npc, enemies[choice[3]], debuffs[choice[0]], 0)];
+            }
+            else {
+              if(npc.battleCurrAtt.charge > enemies[choice[3]].battleCurrAtt.charge*0.75 && 
+                npc.battleCurrAtt.charge >= npc.battleMaxAtt.charge*0.2*attacks[choice[0]].allowCharge) {
+                return ['e', this.skill(npc, enemies[choice[3]], attacks[choice[0]], 1)];
+              }
+              else return ['e', this.skill(npc, enemies[choice[3]], attacks[choice[0]], 0)];
+            }
+          }
+        }
+      }
+    }
+
+    quickCalc(attacker, target, technique) {
+      let scaleLvl = Math.round((attacker.battleCurrAtt.stotal + attacker.level)/2);
+      let damage;
+      if(technique.techType == 'Ki') {
+        damage = 0.95*attacker.battleCurrAtt.energyAttack;
+        damage += Math.round(technique.flatDamage*scaleLvl);
+        damage = this.defenseCalc(damage, (1-technique.armorPen/100)*target.battleCurrAtt.eDefense);
+      }
+      else if(technique.techType == 'Strike') {
+        damage = attacker.battleCurrAtt.physicalAttack;
+        damage += Math.round(technique.flatDamage*scaleLvl);
+        damage = this.defenseCalc(damage, (1-technique.armorPen/100)*target.battleCurrAtt.pDefense);
+      }      
+      damage *= technique.scalePercent;
+      damage *= technique.hits;
+      damage *= Math.min(100,((Number(attacker.battleCurrAtt.critRate)+Number(technique.critRate))/100));
+      damage *= (this.dodgeCalc((1+technique.hitRate/100)*attacker.battleCurrAtt.hit,target.battleCurrAtt.dodge)/100);
+      return damage;
     }
 
     AI(personality, npc, target, ally) {
@@ -675,7 +962,7 @@ class Battle {
     }
   
     dodgeCalc(hit, dodge) {
-      return ((hit/dodge) - 0.2) * 100;
+      return Math.min(100,(((hit/dodge) - 0.2) * 100));
     }
 
     wait() {
@@ -732,7 +1019,26 @@ class Battle {
     }
   
     skill(attacker, target, technique, charge) {
-      if(technique.techType == 'Ki' || technique.techType == 'Strike') {
+      if(technique.coolDown !== 0) {
+        for(let i = 0; i < attacker.techniques.length; i++) {
+          if(this.techList[attacker.techniques[i]].name === technique.name) {
+            attacker.techCooldowns[i] = technique.coolDown;
+          }
+        }
+      }
+      if(technique.aoe !== 0) {
+        let npc = 0;
+        for(let i = 0; i < this.pCombatants.length; i++) {
+          if(this.pCombatants[i].name+this.pCombatants[i].playerID === target.name+target.playerID) {
+            npc = 1;
+            target = this.pCombatants;
+            break;
+          }
+        }
+        if(npc === 0) target = this.NPCombatants;
+        return aoeSkill(attacker,target,technique,charge);
+      }
+      else if(technique.techType == 'Ki' || technique.techType == 'Strike') {
         let str = '';
         let chargeBoost = charge;
         let cHit = Math.round(Math.random() * 100) + 1;
@@ -755,7 +1061,6 @@ class Battle {
         attacker.battleCurrAtt.energy -= technique.energyCost*scaleLvl;
         attacker.battleCurrAtt.charge -= Math.round(attacker.battleMaxAtt.charge * 0.2 * chargeBoost * technique.allowCharge); 
 
-        //if(chargeBoost === 1) chargeBoost = 1 + ((technique.allowCharge-1)/3);
         if(chargeBoost >= 1) chargeBoost = 1 + chargeBoost * 0.33;
         
         //check for dodge, return 0
@@ -769,40 +1074,25 @@ class Battle {
         let r;
         
         if(technique.techType == 'Ki') {
-          damage = 0.8*attacker.battleCurrAtt.energyAttack*attacker.battleCurrAtt.chargeBonus;
+          damage = 0.95*attacker.battleCurrAtt.energyAttack*attacker.battleCurrAtt.chargeBonus;
           damage += Math.round(technique.flatDamage*scaleLvl);
-          //r = this.defenseCalc(attacker.level, attacker.battleCurrAtt.stotal, (1-technique.armorPen/100)*target.battleCurrAtt.eDefense*target.battleCurrAtt.chargeBonus);
           damage = this.defenseCalc(damage, (1-technique.armorPen/100)*target.battleCurrAtt.eDefense*target.battleCurrAtt.chargeBonus);
         }
         else if(technique.techType == 'Strike') {
           damage = attacker.battleCurrAtt.physicalAttack*attacker.battleCurrAtt.chargeBonus;
           damage += Math.round(technique.flatDamage*scaleLvl);
-          //r = this.defenseCalc(attacker.level, attacker.battleCurrAtt.stotal, (1-technique.armorPen/100)*target.battleCurrAtt.pDefense*target.battleCurrAtt.chargeBonus);
           damage = this.defenseCalc(damage, (1-technique.armorPen/100)*target.battleCurrAtt.pDefense*target.battleCurrAtt.chargeBonus);
         }      
         damage *= technique.scalePercent;
-        //damage = Math.round(damage * (1 - r[0]));
         damage *= damR;
         if(chargeBoost != 0) damage *= chargeBoost;
 
-        //Flat reduction from higher defenses
-        //r[1] = r[1]*(1-technique.armorPen/100);
-        //if(r[1] > damage*0.8) r[1] = damage*0.8;
-        //damage = damage-r[1];
-        
-        //number of hits calculation
         let s = technique.hits;
         damage *= s;
         
-        //block calculation
-        /*let dod1 = target.battleCurrAtt.speed*target.battleCurrAtt.chargeBonus;
-        let dod2 = attacker.battleCurrAtt.speed*attacker.battleCurrAtt.chargeBonus - 0.8*target.battleCurrAtt.speed*target.battleCurrAtt.chargeBonus;
-        let adjustment = Math.min(1.1,Math.max(0,dod2/dod1))*100;
-        console.log('block: ' + block + ' <= ' + target.battleCurrAtt.blockRate)
-        console.log('adjusted block: ' + block + ' <= ' + (target.battleCurrAtt.blockRate - adjustment))*/
         if(block <= (target.battleCurrAtt.blockRate)) {
           str = str + '\n' + target.name.replace(/\_/g,' ') + ' blocked!';
-          let blockPow = target.battleCurrAtt.blockPower*target.battleCurrAtt.chargeBonus/Battle.blockModifier;
+          let blockPow = target.battleCurrAtt.blockPower/Battle.blockModifier;
           damage = this.defenseCalc(damage,(1-technique.armorPen/100)*blockPow);
         }
 
@@ -871,7 +1161,7 @@ class Battle {
         let resist = Math.round(Math.random() * 100) + 1;
         let scaleLvl = Math.round((attacker.battleCurrAtt.stotal + attacker.level)/2);
         let calcHit = this.dodgeCalc(attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus, target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus);
-        let calcResist = this.defenseCalc(attacker.level, attacker.battleCurrAtt.stotal, target.battleCurrAtt.magicDefense*target.battleCurrAtt.chargeBonus);
+        let calcResist = this.defenseCalc(1, target.battleCurrAtt.magicDefense*target.battleCurrAtt.chargeBonus);
 
         if(attacker.battleCurrAtt.health < technique.healthCost*scaleLvl || attacker.battleCurrAtt.energy < technique.energyCost*scaleLvl) {
           str = attacker.name.replace(/\_/g,' ') + ' can no longer use ' + technique.name.replace(/\_/g,' ') + '!';
@@ -890,7 +1180,7 @@ class Battle {
         }  
 
         //check for resist, return 0
-        calcResist = (1 - calcResist[0]) * 100;
+        calcResist = (1 - calcResist) * 100;
         if(resist >= calcResist) {
           str = str + '\n' + attacker.name.replace(/\_/g,' ') + "'s technique was resisted by " + target.name.replace(/\_/g,' ') + "!";
           return [0,str];
@@ -922,8 +1212,8 @@ class Battle {
         
         //calculate base heal
         let restore;
-        restore = attacker.battleCurrAtt.magicPower*attacker.battleCurrAtt.chargeBonus*technique.scalePercent;
-        restore += Math.round(technique.flatDamage*scaleLvl*attacker.battleCurrAtt.chargeBonus);
+        restore = attacker.battleCurrAtt.magicPower+technique.flatDamage*scaleLvl;
+        restore *= attacker.battleCurrAtt.chargeBonus*technique.scalePercent;
      
         //check for critical
         if(cHit <= Number(attacker.battleCurrAtt.critRate)+Number(technique.critRate)) {
@@ -939,6 +1229,99 @@ class Battle {
 
         if(technique.health*restore > 0) str = str + '\n' + Math.round(technique.health*restore).toLocaleString(undefined) + ' health restored!';
         if(technique.energy*restore > 0) str = str + '\n' + Math.round(technique.energy*restore).toLocaleString(undefined) + ' energy restored!';
+        return [0,str];
+      }
+    }
+
+    aoeSkill(attacker, targetTeam, technique, charge) {
+      if(technique.techType == 'Buff') {
+        let str = '';
+        let scaleLvl = Math.round((attacker.battleCurrAtt.stotal + attacker.level)/2);
+
+        if(attacker.battleCurrAtt.health < technique.healthCost*scaleLvl || attacker.battleCurrAtt.energy < technique.energyCost*scaleLvl) {
+          str = attacker.name.replace(/\_/g,' ') + ' can no longer use ' + technique.name.replace(/\_/g,' ') + '!';
+          return [0,str];
+        }
+
+        str = str + (attacker.name.replace(/\_/g,' ') + ' uses ' + technique.name.replace(/\_/g,' ') + 'on their team!');
+        
+        attacker.battleCurrAtt.health -= technique.healthCost*scaleLvl;
+        attacker.battleCurrAtt.energy -= technique.energyCost*scaleLvl;
+
+
+        str = str + '\n' + technique.attBonus.outputBonusStr();
+        for(let i = 0; i < targetTeam.length; i++) {
+          if(technique.duration !== null) targetTeam[i].addBuff(technique.attBonus, technique.duration);
+          else targetTeam[i].addBuff(technique.attBonus, -1);
+        }
+        return [0,str];
+      }
+      else if(technique.techType == 'Debuff') {
+        let str = '';
+        let hit = Math.round(Math.random() * 100) + 1;
+        let resist = Math.round(Math.random() * 100) + 1;
+        let scaleLvl = Math.round((attacker.battleCurrAtt.stotal + attacker.level)/2);
+        let calcResist;
+
+        if(attacker.battleCurrAtt.health < technique.healthCost*scaleLvl || attacker.battleCurrAtt.energy < technique.energyCost*scaleLvl) {
+          str = attacker.name.replace(/\_/g,' ') + ' can no longer use ' + technique.name.replace(/\_/g,' ') + '!';
+          return [0,str];
+        }
+
+        str = str + (attacker.name.replace(/\_/g,' ') + ' uses ' + technique.name.replace(/\_/g,' ') + '!');
+        
+        attacker.battleCurrAtt.health -= technique.healthCost*scaleLvl;
+        attacker.battleCurrAtt.energy -= technique.energyCost*scaleLvl;  
+
+
+        for(let i = 0; i < targetTeam.length; i++) {
+          calcResist = this.defenseCalc(attacker.level, attacker.battleCurrAtt.stotal, targetTeam[i].battleCurrAtt.magicDefense*targetTeam[i].battleCurrAtt.chargeBonus);
+          //check for resist, return 0
+          calcResist = (1 - calcResist[0]) * 100;
+          if(resist >= calcResist) {
+            str = str + '\n' + attacker.name.replace(/\_/g,' ') + "'s technique was resisted by " + targetTeam[i].name.replace(/\_/g,' ') + "!";
+          }
+          else if(technique.duration !== null) targetTeam[i].addBuff(technique.attBonus, technique.duration);
+          else targetTeam[i].addBuff(technique.attBonus, -1);
+        }
+        str = str + '\n' + technique.attBonus.outputBonusStr();
+        return [0,str];
+      }
+      else if(technique.techType == 'Restoration') {
+        let str = '';
+        let chargeBoost = charge;
+        let cHit = Math.round(Math.random() * 100) + 1;
+        let healR = Math.random() * 0.2 + 0.9;
+        let scaleLvl = Math.round((attacker.battleCurrAtt.stotal + attacker.level)/2);
+
+        if(attacker.battleCurrAtt.health < technique.healthCost*scaleLvl || attacker.battleCurrAtt.energy < technique.energyCost*scaleLvl) {
+          str = attacker.name.replace(/\_/g,' ') + ' can no longer use ' + technique.name.replace(/\_/g,' ') + '!';
+          return [0,str];
+        }
+
+        if(chargeBoost === null) chargeBoost = 0;
+
+        str = str + (attacker.name.replace(/\_/g,' ') + ' uses ' + technique.name.replace(/\_/g,' ') + '!');
+        
+        attacker.battleCurrAtt.health -= technique.healthCost*scaleLvl;
+        attacker.battleCurrAtt.energy -= technique.energyCost*scaleLvl;
+        
+        //calculate base heal
+        let restore;
+        restore = attacker.battleCurrAtt.magicPower*attacker.battleCurrAtt.chargeBonus*technique.scalePercent;
+        restore += Math.round(technique.flatDamage*scaleLvl*attacker.battleCurrAtt.chargeBonus);
+
+        for(let i = 0; i < targetTeam.length; i++) {
+          //todo: new variable hpRestore/epRestore to apply on regen instead?
+          targetTeam[i].battleCurrAtt.health += Math.round(technique.health*restore);
+          targetTeam[i].battleCurrAtt.energy += Math.round(technique.energy*restore);
+          targetTeam[i].battleCurrAtt.health = Math.min(targetTeam[i].battleCurrAtt.health,targetTeam[i].battleMaxAtt.health);
+          targetTeam[i].battleCurrAtt.energy = Math.min(targetTeam[i].battleCurrAtt.energy,targetTeam[i].battleMaxAtt.energy);
+
+          if(technique.health*restore > 0) str = str + '\n' + Math.round(technique.health*restore).toLocaleString(undefined) + ' health restored to ' + targetTeam[i].name.replace(/\_/g,' ') + '!';
+          if(technique.energy*restore > 0) str = str + '\n' + Math.round(technique.energy*restore).toLocaleString(undefined) + ' energy restored to ' + targetTeam[i].name.replace(/\_/g,' ') + '!';
+        }
+
         return [0,str];
       }
     }
@@ -960,7 +1343,7 @@ class Battle {
 
       //staff weapons
       if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("staff") !== -1 || attacker.weapon.name.toLowerCase().search("stave") !== -1 || attacker.weapon.name.toLowerCase().search("cane") !== -1)) { 
-        s = Math.round((1.2 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.95 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        s = Math.round((1.3 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.9 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
         if(s < 2) s = 2;
         burst = new Technique(-1, "Ki Beam", "Ki", 0, 0, 20, 1, s);
         burst.hitRate = 0.1;
@@ -968,7 +1351,7 @@ class Battle {
         burst.critRate = 0.05;
       } //rod weapons
       else if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("rod") !== -1 || attacker.weapon.name.toLowerCase().search("wand") !== -1 || attacker.weapon.name.toLowerCase().search("scepter") !== -1)) {
-        s = Math.round((1.25 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.95 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        s = Math.round((1.35 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (0.9 * target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
         if(s < 2) s = 2;
         burst = new Technique(-1, "Ki Ray", "Ki", 0, 0, 60, 0.8, s);
         burst.hitRate = 0.15;
@@ -984,7 +1367,7 @@ class Battle {
         burst.critRate = 0.1;
       }//ki focus weapons
       else if(attacker.weapon !== null && (attacker.weapon.name.toLowerCase().search("focus") !== -1 || attacker.weapon.name.toLowerCase().search("orb") !== -1)) {
-        s = Math.round((1.15 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
+        s = Math.round((1.2 * attacker.battleCurrAtt.speed * attacker.battleCurrAtt.chargeBonus) / (target.battleCurrAtt.speed * target.battleCurrAtt.chargeBonus));
         if(s < 1) s = 1;
         burst = new Technique(-1, "Ki Ball", "Ki", 0, 0, 5, 3, s);
         burst.armorPen = 0.05;

@@ -2,12 +2,13 @@
 class Help {
 	static tutorialReward = 50000;
 	//all commands players can use -> selectbox
+	//"npcstat", "npcastat",
 	static commands = [
 		"help", "ping", "top", 
 		"npclist", "newchar","overwrite", 
 		"mychar", "setchar", "setcharimage", 
 		"statup", "stat", "astat", 
-		"npcstat", "npcastat", "deaths", 
+		"deaths", 
 		"buffs", "party", "battle", 
 		"spar", "npcspar", "suppress", 
 		"forfeit", "inv", "equips", 
@@ -97,6 +98,9 @@ class Help {
 			}
 			else if(topic === "npcspar") {
 				return ["npcspar [NPC name]","Start a safe battle with an NPC."]
+			}
+			else if(topic === "trial") {
+				return ["trial\ntrial [name]","Use this command without argumens to see the list of trials available. Trials are single player battles against strong enemy groups with certain garaunteed rewards for first time clears."]
 			}
 			else if(topic === "suppress") {
 				return ["suppress [optional: percent reduction]","Adds a buff that reduces all stats outside CON and ENG to match either the enemy or to an arbitrary percent given."]
@@ -319,11 +323,11 @@ class Help {
 				return [str,null];
 			}
 			else if(topic === "Charge") {
-				let str = "A measurement of how much Ki a character can use to empower themselves. Charge stacks are multiplied by charge bonus before being applied to increase many of the other advanced stats in battle."
+				let str = "A measurement of how much Ki a character can use to empower themselves. The amount of charge you have is used to calculate Charge Bonus, before being applied to increase many of the other advanced stats in battle."
 				return [str,null];
 			}
 			else if(topic === "Charge Bonus") {
-				let str = "How effective a character's charge stacks are."
+				let str = "How effective a character's charge stacks are. This is a multiplier for many stats during combat."
 				return [str,null];
 			}
 			else if(topic === "Hit Rate") {
@@ -363,7 +367,7 @@ class Help {
 				return [str,null];
 			}
 			else if(topic === "Magic Power") {
-				let str = "Magic Power effects how accurate Debuff skills are, and how powerful restoration skills are."
+				let str = "Magic Power effects how powerful restoration skills are."
 				return [str,null];
 			}
 			else if(topic === "Magical Defense") {
@@ -437,6 +441,13 @@ class Help {
 				str = str + "\n**Other Bonuses** 10% Charge Bonus, 10% Max Charge, 10% Health, 10% Energy, 20% Regen, 10% Crit Rate"
 				str = str + "\n**Levelup Bonus** 2 Str, 1 Dex, 3 Con, 3 Eng, 1 Sol, 2 Foc"
 				str = str + "\n**'Alien'** is the catch-all group for any race either unnamed or unlisted for the game. They're a fairly versatile race, similar to Earthlings, but work better as tanks than support."
+				return [str,null];
+			}
+			else if(topic === "Core Person") {
+				let str = "**Mainstat Multipliers** 10% Str, 15% Dex, 0% Con, 10% Eng, 15% Sol, 30% Foc"
+				str = str + "\n**Other Bonuses** 30% Charge Max, 10% Hit chance, 10% Crit Damage, 20% Magic Power, 50% Magic Defense"
+				str = str + "\n**Levelup Bonus** 1 Str, 3 Dex, 2 Con, 2 Eng, 2 Sol, 4 Foc"
+				str = str + "\n**Core People** are best known as their role for managing the galaxy as Kais. They are few in number, but have powerful magical potential. They work well as supports, or damage dealers, but are only available to those who have proven themselves to the Kais."
 				return [str,null];
 			}
 		}

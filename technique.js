@@ -6,6 +6,8 @@ class Technique {
 	constructor(uid, name, type, hpCost, enCost, flatDam, damageScale, hits) {
     this.UID = uid;
     this.tag = "None";
+    this.aoe = 0;
+    this.coolDown = 0;
 
       if(type == "Ki") {
         this.scalePercent = damageScale;

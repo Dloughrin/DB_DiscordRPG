@@ -39,6 +39,7 @@ class Raid {
 	}
 
 	static raidReward(raidID, char, user) { 
+		console.log(char.name)
 		let str = ""
 		if(raidID === 1) {
 				if(parseInt(char.potentialUnlocked) === 0) {
@@ -203,8 +204,8 @@ class Raid {
 		party.partyList.push(kaiAttendant);
 
 		let gohanClone = Gohan.clone();
-		gohanClone.level = level;
-		gohanClone = Raid.scaleStats(gohanClone,kaioshin.attributes.stotal*1.05);
+		gohanClone.level = level-50;
+		gohanClone = Raid.scaleStats(gohanClone,kaioshin.attributes.stotal*0.95);
 
 
 		//[char,gohanClone]

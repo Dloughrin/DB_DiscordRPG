@@ -62,7 +62,7 @@ class Attributes {
 		this.eDefense = Math.round((25 + (this.eng*2+this.sol*(2/3)+this.foc*(1/3)+2+this.str*(1/10)))*this.btotal.eDefense);
 
 		this.magicPower = Math.round(((0 + (this.sol+(this.foc*2)+(this.eng/2)+1)*level) / 10)*this.btotal.magicPower);
-		this.magicDefense = Math.round(((10 + (this.sol+2)*level) / 3)*this.btotal.magicDefense);
+		this.magicDefense = Math.round(((50 + this.sol*1.5 + this.eng) / 3)*this.btotal.magicDefense);
         
     this.physicalAttack = 30 + Math.round(((3 + this.str*2 + this.dex*0.5) * level / 2)*this.btotal.physicalAttack);
     this.energyAttack = 25 + Math.round(((1 + this.sol*2 + this.foc*0.4) * level / 2)*this.btotal.energyAttack);
@@ -99,11 +99,11 @@ class Attributes {
 	}
   
     setChargeBonus() {
-      this.chargeBonus = (1 + this.charge * 0.05) * this.btotal.chargeBonus;
+      this.chargeBonus = 1 + (this.charge * 0.05) * this.btotal.chargeBonus;
     }
   
     scanPowerLevel(charge, level) {
-       let chargeBonus = 1 + (charge * 0.15 * 0.66);
+       let chargeBonus = 1 + (charge * 0.05) * this.btotal.chargeBonus;
        return Math.round(((1+level)*0.75) * chargeBonus * (10 + this.str*25 + this.dex*20 + this.con*30 + this.eng*30 + this.sol*25 + this.foc*20));
     }
 }

@@ -1438,6 +1438,50 @@ class Battle {
 
       return strike;
     }
+
+    calcTech(attacker, target, technique) {
+      let damage;
+      let scaleLvl = Math.round((attacker.battleCurrAtt.stotal + attacker.level)/2);
+      if(technique.techType == 'Ki') {
+        damage = 0.95*attacker.battleCurrAtt.energyAttack;
+        damage += Math.round(technique.flatDamage*scaleLvl);
+        damage = this.defenseCalc(damage, (1-technique.armorPen/100)*target.battleCurrAtt.eDefense*target.battleCurrAtt.chargeBonus);
+      }
+      else if(technique.techType == 'Strike') {
+        damage = attacker.battleCurrAtt.physicalAttack;
+        damage += Math.round(technique.flatDamage*scaleLvl);
+        damage = this.defenseCalc(damage, (1-technique.armorPen/100)*target.battleCurrAtt.pDefense*target.battleCurrAtt.chargeBonus);
+      }      
+      else if(technique.techType == 'Restoration') {
+        damage = attacker.battleCurrAtt.magicPower;
+        damage += Math.round(technique.flatDamage*scaleLvl);
+      }     
+      damage *= attacker.battleCurrAtt.chargeBonus;
+      damage *= technique.scalePercent;
+      if(technique.techType !== 'Restoration') damage *= technique.hits;
+
+      let cdamage = damage * attacker.battleCurrAtt.critDamage;
+
+      let blockPow = target.battleCurrAtt.blockPower/Battle.blockModifier;
+      let bdamage = this.defenseCalc(damage,(1-technique.armorPen/100)*blockPow);
+
+      let critRate = Number(attacker.battleCurrAtt.critRate)+Number(technique.critRate);
+      let hitRate = this.dodgeCalc((1+technique.hitRate/100)*attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus, target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus);
+
+      return [technique.name, damage, cdamage, bdamage, technique.hits, hitRate, critRate];
+    }
+
+    calcBurst(attacker, target) {
+      let burst = this.setBurst(attacker, target);
+      let out = this.calcTech(attacker, target, burst);
+      return out;
+    }
+
+    calcStrike(attacker, target) {
+      let strike = this.setStrike(attacker, target);
+      let out = this.calcTech(attacker, target, strike);
+      return out;
+    }
 }
 
 module.exports = {

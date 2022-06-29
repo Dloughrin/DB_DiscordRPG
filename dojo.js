@@ -13,43 +13,39 @@ const Character = char.Character;
  * guild buffs.
 ************/
 class Dojo {
-	constructor(leader,name) {
+	constructor(leader,name,styleName) {
 		leader.dojo = this;
 		this.guildLeader = leader;
 		this.guildName = name;
-		this.guildStyle = leader.styleName;
+		this.guildStyle = styleName;
 		this.guildList = new Array();
 		this.guildList.push(leader);
 
 		this.maxSize = 100;
-
-		this.disbanding = 0;
 	}
 
-	addCharacter(newChar) { 
+	addPlayer(user) { 
 		for(let i = 0; i < this.guildList.length; i++) {
-			if(this.guildList[i].name === newChar.name && this.guildList[i].playerID === newChar.playerID) {
+			if(this.guildList[i].userID === user.userID) {
 				return -1;
 			}
 		}
 
 		if(this.guildList.length < this.maxSize) {
-			newChar.dojo = this;
-			this.guildList.push(newChar);
-			this.expMod = 1 - (0.1 * (this.guildList.length-1));
+			user.dojo = this;
+			this.guildList.push(user);
 			return 1;
 		}
 		else return 0;
 	}
 
-	removeCharacter(char) { 
+	removePlayer(user) { 
 		for(let i = 0; i < this.guildList.length; i++) {
-			if(this.guildLeader.name === char.name && this.guildLeader.playerID === char.playerID) {
+			if(this.guildLeader.userID === user.userID) {
 				return -1;
 			}
-			else if(this.guildList[i].name === char.name && this.guildList[i].playerID === char.playerID) {
+			else if(this.guildList[i].userID === user.userID) {
 				this.guildList.splice(i,1);
-				this.expMod = 1 - (0.1 * (this.guildList.length-1));
 				return 1;
 			}
 		}

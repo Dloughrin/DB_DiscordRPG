@@ -50,13 +50,14 @@ class Attributes {
 
 		this.hit = Math.round((0.5*level + 10 +(this.dex*0.25)+(this.foc)+0.05*(this.str+this.sol))*this.btotal.hit);
 		this.dodge = Math.round(((0.4*level + 5 + (this.dex*0.75)+(this.foc*0.3)))*this.btotal.dodge);
+    this.speed = Math.round((10 + (this.dex+(0.75*this.foc)+10)*level)*this.btotal.speed);
     //this.critRate = Math.min(80,Math.round((5 + (this.dex/10 + this.foc/15))*(this.btotal.critRate)));
     this.critRate = Math.round((5 + (3.5*Math.pow(this.dex,0.33) + 3*Math.pow(this.foc,0.25)))*(this.btotal.critRate));
     this.critDamage = (1.2 + (this.str * (1/10) + this.dex * (3/40) + this.foc * (5/20) + this.sol * (1/10))/100)*this.btotal.critDamage;
 		//this.blockRate = Math.min(90,((15 + (this.dex/25 + this.foc/25 + this.str/15))*this.btotal.blockRate));
 		this.blockRate = Math.min(90,((5 + (1.15*Math.pow(this.dex,0.33) + Math.pow(this.foc,0.33) + 1.2*Math.pow(this.str,0.5)))*this.btotal.blockRate));
 		this.blockPower = Math.min(1200,Math.round(100 + ((this.con*1.25)+(this.str*0.75)+(this.sol*0.75))*this.btotal.blockPower));
-		this.speed = Math.round((10 + (this.dex+(0.75*this.foc)+10)*level)*this.btotal.speed);
+		
 
 		this.pDefense = Math.round((25 + (this.con*2+this.str*(2/3)+this.foc*(1/6)+this.dex*(1/6)+2+this.sol*(1/10)))*this.btotal.pDefense);
 		this.eDefense = Math.round((25 + (this.eng*2+this.sol*(2/3)+this.foc*(1/3)+2+this.str*(1/10)))*this.btotal.eDefense);

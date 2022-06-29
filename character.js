@@ -35,7 +35,6 @@ class Character {
 		this.nextEXP = 1;
     this.nextLevel(this.level);
 
-    this.dojo = null;
     this.party = null;
     this.earnedEXP = 0;
 
@@ -107,7 +106,6 @@ class Character {
     char.totalexp = this.totalexp;
     char.nextEXP = this.nextEXP;
 
-    char.dojo = this.dojo;
     char.party = this.party;
     char.potentialUnlocked = this.potentialUnlocked;
     char.potentialUnlocked = this.potentialUnleashed;

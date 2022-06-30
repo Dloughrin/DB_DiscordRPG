@@ -249,7 +249,7 @@ class Character {
 
   addTechnique(tech, user) {
     if(this.techniques.length <= 5) {
-      if(user === 'NPC' || user.ifTag(tech)) {
+      if((user === 'NPC' || user.ifTag(tech)) && !isNaN(tech)) {
         this.techniques.push(tech);
         this.techCooldowns.push(0);
         return "Added to slot " + this.techniques.length + ".";
@@ -379,8 +379,8 @@ class Character {
       this.statusUpdate(0);
       
       count++;
-      if(count > 1) str = ('\n' + this.name.replace(/\_/g,' ') + " has leveled up " + count.toLocaleString(undefined) + " times!");
-      else str = ('\n' + this.name.replace(/\_/g,' ') + " has leveled up!");
+      if(count > 1) str = ('\n**' + this.name.replace(/\_/g,' ') + "** has leveled up " + count.toLocaleString(undefined) + " times!");
+      else str = ('\n**' + this.name.replace(/\_/g,' ') + "** has leveled up!");
 		}
     return str;
 	}

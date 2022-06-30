@@ -142,6 +142,12 @@ class AttributeBonus {
 		}
 	}
 
+	loadObject(obj) {
+		for(var prop in obj) {
+			this[prop] = obj[prop];
+		}
+	}
+
 	loadBonuses(bstr,bdex,bcon,beng,bsol,bfoc,chargeBonus,health,energy,healthRegen,energyRegen,
 		charge,hit,dodge,speed,critRate,critDamage,blockRate,blockPower,pDefense,eDefense,magicPower,
 		magicDefense,physicalAttack,energyAttack) {

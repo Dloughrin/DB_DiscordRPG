@@ -59,6 +59,7 @@ class Character {
     /**********
     Battle
     **********/
+    this.training = 0;
 
     this.eTarget = 0;
     this.aTarget = 0;

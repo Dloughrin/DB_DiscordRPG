@@ -60,6 +60,7 @@ class Character {
     Battle
     **********/
     this.training = 0;
+    this.trainingType = "";
 
     this.eTarget = 0;
     this.aTarget = 0;

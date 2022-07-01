@@ -65,13 +65,13 @@ class Attributes {
 		this.magicPower = Math.round(((0 + (this.sol+(this.foc*2)+(this.eng/2)+1)*level) / 10)*this.btotal.magicPower);
 		this.magicDefense = Math.round(((50 + this.sol*1.5 + this.eng) / 3)*this.btotal.magicDefense);
         
-    this.physicalAttack = 30 + Math.round(((3 + this.str*2 + this.dex*0.5) * level / 2)*this.btotal.physicalAttack);
-    this.energyAttack = 25 + Math.round(((1 + this.sol*2 + this.foc*0.4) * level / 2)*this.btotal.energyAttack);
+    this.physicalAttack = 30 + Math.round(((3 + this.str*2 + this.dex*0.5) * level / 2));
+    this.energyAttack = 25 + Math.round(((1 + this.sol*2 + this.foc*0.4) * level / 2));
 
     let physBonus = Math.floor(this.physicalAttack*0.3);
     let energyBonus = Math.floor(this.energyAttack*0.3);
-    this.physicalAttack = Math.floor(this.physicalAttack*0.8) + energyBonus;
-    this.energyAttack = Math.floor(this.energyAttack*0.8) + physBonus;
+    this.physicalAttack = Math.floor(((this.physicalAttack*0.8) + energyBonus)*this.btotal.physicalAttack);
+    this.energyAttack = Math.floor(((this.energyAttack*0.8) + physBonus)*this.btotal.energyAttack);
 	}
 
 	calculate(level) {

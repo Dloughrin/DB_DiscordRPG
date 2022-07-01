@@ -43,6 +43,13 @@ class Equipment {
 		}
 
 	}
+	
+	loadObject(obj) {
+		for(var prop in obj) {
+			if(typeof this[prop] !== 'undefined') this[prop] = obj[prop];
+		}
+	}
+
 	printequipment() {
 		return [this.name, this.type, this.attbonus.outputBonusStr()]
 	}

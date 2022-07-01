@@ -67,6 +67,11 @@ class Attributes {
         
     this.physicalAttack = 30 + Math.round(((3 + this.str*2 + this.dex*0.5) * level / 2)*this.btotal.physicalAttack);
     this.energyAttack = 25 + Math.round(((1 + this.sol*2 + this.foc*0.4) * level / 2)*this.btotal.energyAttack);
+
+    let physBonus = Math.floor(this.physicalAttack*0.3);
+    let energyBonus = Math.floor(this.energyAttack*0.3);
+    this.physicalAttack = Math.floor(this.physicalAttack*0.8) + energyBonus;
+    this.energyAttack = Math.floor(this.energyAttack*0.8) + physBonus;
 	}
 
 	calculate(level) {

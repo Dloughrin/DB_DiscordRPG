@@ -144,7 +144,18 @@ class AttributeBonus {
 
 	loadObject(obj) {
 		for(var prop in obj) {
-			this[prop] = obj[prop];
+			if(typeof this[prop] !== 'undefined') this[prop] = obj[prop];
+		}
+	}
+
+	//mostly for scaling NPC fighting styles in raids
+	scaleStats(scalar) {
+		for(var prop in this) {
+			if(this[prop] == this.name || this[prop] == this.type || this[prop] == this.listID || this[prop] == this.duration) {
+			}
+			else if(this[prop] > 0) {
+				this[prop] *= scalar;
+			}
 		}
 	}
 

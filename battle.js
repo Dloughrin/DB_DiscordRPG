@@ -325,8 +325,15 @@ class Battle {
               scaler*this.techList[npc.techniques[i]].healthCost <= npc.battleCurrAtt.health) { heals.push(this.techList[npc.techniques[i]]); }
           }
           else if(this.techList[npc.techniques[i]].techType === "Ki" || this.techList[npc.techniques[i]].techType === "Strike") {
+            let usable = 0;
+            if(this.techList[npc.techniques[i]].transReq === "None" || 
+              (npc.transformation !== -1 && this.techList[npc.transformation].name.search(this.techList[npc.techniques[i]].transReq) !== -1))
+            { usable = 1; }
+
             if(scaler*this.techList[npc.techniques[i]].energyCost <= npc.battleCurrAtt.energy &&
-              scaler*this.techList[npc.techniques[i]].healthCost <= npc.battleCurrAtt.health) { attacks.push(this.techList[npc.techniques[i]]); }
+              scaler*this.techList[npc.techniques[i]].healthCost <= npc.battleCurrAtt.health
+              && usable == 1) 
+              { attacks.push(this.techList[npc.techniques[i]]); }
           }
         }
 
@@ -335,7 +342,7 @@ class Battle {
           if(enemies[i].battleCurrAtt.health <= 0) continue;
           else if(npc.battleCurrAtt.charge/npc.battleMaxAtt.charge < enemies[i].battleCurrAtt.charge/enemies[i].battleMaxAtt.charge) choices[2][1] += 1;
 
-          let threat = (enemies[i].battleCurrAtt.stotal+enemies[i].battleCurrAtt.con+enemies[i].level) / (npc.battleCurrAtt.stotal+npc.level)
+          let threat = (enemies[i].battleCurrAtt.stotal+(3*enemies[i].battleCurrAtt.con)+enemies[i].level) / (npc.battleCurrAtt.stotal+npc.level)
 
           let choiceMods = new Array();
           for(let j = 0; j < choices.length; j++) choiceMods.push(choices[j]);
@@ -550,7 +557,7 @@ class Battle {
       return damage;
     }
 
-    AI(personality, npc, target, ally) {
+    /*AI(personality, npc, target, ally) {
       let choices = new Array();
       let techPref = new Array();
       choices.push(["Strike",Number(personality[0])]); //strike
@@ -819,7 +826,7 @@ class Battle {
           else return ['e', this.skill(npc, target, this.techList[chosenTech], 0)];
         }
       }
-    }
+    }*/
 
     executeActions() {
       this.turn++;
@@ -1045,6 +1052,12 @@ class Battle {
         let hit = Math.round(Math.random() * 100) + 1;
         let block = Math.round(Math.random() * 100) + 1;
         let damR = Math.random() * 0.2 + 0.9;
+        let temptrans = 0;
+        if(technique.transReq !== "None" && attacker.isTransformed === -1) {
+          this.transform(attacker);
+          temptrans = 1;
+        }
+
         let scaleLvl = Math.round((attacker.battleCurrAtt.stotal + attacker.level)/2);
         let calcHit = this.dodgeCalc((1+technique.hitRate/100)*attacker.battleCurrAtt.hit*attacker.battleCurrAtt.chargeBonus, target.battleCurrAtt.dodge*target.battleCurrAtt.chargeBonus);
 
@@ -1102,6 +1115,11 @@ class Battle {
           damage = damage * attacker.battleCurrAtt.critDamage;
         }
         
+        if(temptrans == 1 && attacker.isTransformed !== -1) {
+          attacker.transformationCost(this.techList[attacker.transformation]);
+          this.transform(attacker);
+        }
+
         //clean up and msg.channel.send
         damage = Math.round(damage);
         if(damage < 0) damage = 0;

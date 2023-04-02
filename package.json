@@ -1,0 +1,12 @@
+{
+  "name": "zeno-bot",
+  "version": "1.0.0",
+  "description": "DBZ bot",
+  "main": "zeno.js",
+  "author": "Dustin Loughrin",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^13.8.0",
+    "xlsx": "^0.18.5"
+  }
+}

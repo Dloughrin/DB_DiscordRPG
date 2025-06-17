@@ -1,4 +1,5 @@
-const token = 'OTkzNzY4MTQwODkyODE5NDc4.G4rxFf.ychJnHWV6svOkt0MXg3wCBzNoLvdrFFC3bl-4A';
+const { token, prefix, devID } = require('./helpers/variables')
+const { Helpers } = require('./helpers/helpers')
 
 /* 
   Credits
@@ -22,6 +23,7 @@ const party = require("./RPG/party.js");
 const dojo = require("./RPG/dojo.js");
 const load = require("./loader.js");
 const user = require("./user.js");
+const techImprov = require("./RPG/techniqueImprovement.js");
 
 
 const Raid = raid.Raid;
@@ -39,25 +41,26 @@ const Help = help.Help;
 const Naming = naming.Naming;
 const Equipment = equipment.Equipment;
 const Inventory = inventory.Inventory;
+const TechImp = techImprov.techniqueImprovement;
 
 const Discord = require("discord.js");
-const { Client, Intents } = require('discord.js');
-const { MessageActionRow, MessageButton, MessageSelectMenu } = require('discord.js');
+const { Client, GatewayIntentBits, ButtonStyle } = require('discord.js');
+const { ActionRowBuilder, ButtonBuilder, SelectMenuBuilder } = require('discord.js');
 
 // ---------------------------------------
 
-const myIntents = new Intents(13827);
-/*myIntents.add(Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.DIRECT_MESSAGES, 
+/*const myIntents = new Intents(3276543);
+myIntents.add(Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.DIRECT_MESSAGES, 
   Intents.FLAGS.GUILD_MESSAGE_REACTIONS, Intents.FLAGS.DIRECT_MESSAGE_TYPING, 
   Intents.FLAGS.DIRECT_MESSAGE_REACTIONS, Intents.FLAGS.);*/
 const bot = new Discord.Client({
-  intents: myIntents,
+  intents: Object.keys(GatewayIntentBits).map((a)=>{
+    return GatewayIntentBits[a]
+    }),
   restTimeOffset: 0
 });
 const loader = new Loader();
 const nameGenerator = new Naming();
-const prefix = 'g';
-const devID = '108035991394074624';
 
 const statEXP = 40;
 const levelEXP = 25;
@@ -65,8 +68,6 @@ const npcEXPMulti = 5;
 
 const styleBonusCap = 100;
 const styleStatCap = 0.50;
-const trainingModifier = 1.25;
-const trainingSoftCap = 2500
 
 // ---------------------------------------
 
@@ -80,6 +81,25 @@ let partyList = new Array();
 let dojoList = new Array();
 
 let activeCombatList = new Array();
+
+// ---------------------------------------
+
+const args = process.argv.slice(2);
+if (args.includes('--deploy')) {
+  const { spawnSync } = require('child_process');
+
+  console.log('Running deploy-commands.js...');
+  const result = spawnSync('node', ['./helpers/deploy-commands.js'], {
+    stdio: 'inherit'
+  });
+
+  if (result.status !== 0) {
+    console.error(`Deploy script failed with code ${result.status}`);
+    process.exit(result.status); // exit if deploy failed
+  }
+
+  console.log('Deploy complete. Starting bot normally...');
+}
 
 // ---------------------------------------
 
@@ -112,9 +132,9 @@ bot.login(token)
 
 // ---------------------------------------
 
-const statusEmbed = new Discord.MessageEmbed()
+const statusEmbed = new Discord.EmbedBuilder()
     .setColor('#0099ff');
-const messageEmbed = new Discord.MessageEmbed()
+const messageEmbed = new Discord.EmbedBuilder()
     .setColor('#ff99ff');
 
 // ---------------------------------------
@@ -123,7 +143,7 @@ setInterval(function() {
   loader.backUpData(users,itemList,charList,npcList,partyList,techList,invList,dojoList);
   for(let i = 0; i < npcList.length; i++) {
     if(npcList[i].attributes.stotal < 200) continue;
-    let xp = calcNPCTrainingGain(npcList[i]);
+    let xp = Helpers.calcNPCTrainingGain(npcList[i]);
     npcList[i].addEXP(xp);
     if(npcList[i].level >= npcList[i].attributes.stotal * 0.5) {
       let texp = npcList[i].exp * 0.55
@@ -137,11 +157,61 @@ setInterval(function() {
   console.log("Data backup saved.")
 }, 1000*60*45) // 1000 miliseconds * 60 seconds * 30 minutes
 
-bot.on('messageCreate', async (msg) => {
+
+bot.on('interactionCreate', async interaction => {
+if (!interaction.isChatInputCommand()) return;
+
+  let commandName = interaction.commandName;
+  console.log("Received command:", commandName);
+
+  if (commandName === 'leaderboard') {
+    await findStrongest(interaction);
+  }
+
+  if (commandName === 'npclist') {
+    await listNPCs(interaction);
+  }
+
+  if (commandName === 'help') {
+    await displayHelp(null, interaction);
+  }
+
+  if(commandName === 'commands') {
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Command List');
+
+    interaction.deferReply({ ephemeral: true });
+
+    for(let i = 0; i < Help.commands.length; i++) {
+      let str = Help.helpRequest(Help.commands[i],"commands")[1];
+      currEmbed.addFields(
+      { name: '**' + Help.commands[i] + '**', value: str, inline:false }
+      );
+      if((i % 9 === 0 && i > 0) || i+1 >= Help.commands.length) {
+        try {
+          await interaction.user.send({ embeds: [currEmbed] });
+          currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Command List');
+        } catch (err) {
+          console.error("Send failed:", err);
+        }
+      }
+    }
+
+    await interaction.editReply({ content: "Sent!" });
+  }
+
+  if (commandName === 'profile') {
+    await viewProfile(interaction);
+  }
+})
+
+let msg = "";
+bot.on('messageCreate', async (nmsg) => {
   //if our message doesnt start with our defined prefix, dont go any further into function
-  if(!msg.content.toLowerCase().startsWith(prefix)) {
+  if(!nmsg.content.toLowerCase().startsWith(prefix)) {
     return
   }
+
+  msg = nmsg;
   
   //slices off prefix from our message, then trims extra whitespace, then returns our array of words from the message
   const args = msg.content.slice(prefix.length).toLowerCase().trim().split(' ')
@@ -175,7 +245,7 @@ bot.on('messageCreate', async (msg) => {
     }
     else if(args.length === 1 && args[0] === "list") {
 
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Command List');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Command List');
       for(let i = 0; i < Help.commands.length; i++) {
         let str = Help.helpRequest(Help.commands[i],"commands")[1];
         currEmbed.addFields(
@@ -183,39 +253,39 @@ bot.on('messageCreate', async (msg) => {
         );
         if((i % 9 === 0 && i > 0) || i+1 >= Help.commands.length) {
           msg.author.send({ embeds: [currEmbed] });
-          currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Command List');
+          currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Command List');
         }
       }
     }
   }
 
   if(command === 'training' || command === 'train') {
-    let index = getCharListIndex(msg.author.id);
+    let index = Helpers.getCharListIndex(msg.author.id, users);
     if(index === null) return;
 
     if(args.length === 1) {
       if(args[0] === "log") {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Training Log');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Training Log');
         currEmbed.setDescription(users[index].checkTrainingLog());
         msg.channel.send({ embeds: [currEmbed] });
         return;
       }
       else if(args[0] === "end") {
-        let ci = findID(msg.author.id);
+        let ci = Helpers.findID(msg.author.id, charList, users);
         if(index === -1) return;
 
         charList[ci].training = 0;
         charList[ci].trainingType = "";
         loader.characterSaver(charList);
 
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Training Ended Early');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Training Ended Early');
         currEmbed.setDescription('No resources refunded.');
         msg.channel.send({ embeds: [currEmbed] });
 
         return;
       }
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('training log | training');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -228,14 +298,14 @@ bot.on('messageCreate', async (msg) => {
       }
       if(training < (users[index].charIDs.length-1)) displayTraining(msg.author.id, index);
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
         currEmbed.setDescription('You must have at least 1 character available.');
         msg.channel.send({ embeds: [currEmbed] });
         return;
       }
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('training log | training');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -243,12 +313,12 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'guild' || command === 'dojo') {
-    let index = getCharListIndex(msg.author.id);
+    let index = Helpers.getCharListIndex(msg.author.id, users);
     if(index === null) return;
 
     if(args.length === 0) {
       if(users[index].dojo === null) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
         currEmbed.setDescription('This user is not in a dojo. Use dojo create [name] to make one.');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -258,7 +328,7 @@ bot.on('messageCreate', async (msg) => {
     }
     else if(args.length === 1) {
       if(users[index].dojo === null) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
         currEmbed.setDescription('This user is not in a dojo. Use dojo create [name] to make one.');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -266,14 +336,14 @@ bot.on('messageCreate', async (msg) => {
       if(args[0] === 'disband') { 
         if(users[index].dojo.disbanding === 0) { 
           if(users[index].dojo.guildLeader.userID !== users[index].userID) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
             currEmbed.setDescription("You're not the dojo leader.");
             msg.channel.send({ embeds: [currEmbed] });
             return;
           }
           else {
             users[index].dojo.disbanding = 1;
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Are you sure?');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Are you sure?');
             currEmbed.setDescription('Use this command again to disband your dojo ' + users[index].dojo.guildName.replace(/\_/g,' ') + '.');
             msg.channel.send({ embeds: [currEmbed] });
             return;
@@ -293,14 +363,14 @@ bot.on('messageCreate', async (msg) => {
           dojoList.splice(pIndex,1);
           loader.dojoSaver(dojoList);
 
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Done.');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Done.');
           currEmbed.setDescription('Your dojo has been disbanded.');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
       }
       else if(args[0] === 'members') {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(users[index].dojo.guildName.replace(/\_/g,' ') + ' Dojo Information');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(users[index].dojo.guildName.replace(/\_/g,' ') + ' Dojo Information');
         let estr = 'Total Members: ' + users[index].dojo.guildList.length + ' / ' + users[index].dojo.maxSize;
         let valueStr = 'Guild Leader: <@' + users[index].dojo.guildLeader.userID + '>';
         valueStr += '\nGuild Style Name: ' + users[index].dojo.guildStyle.replace(/\_/g,' ');
@@ -310,7 +380,7 @@ bot.on('messageCreate', async (msg) => {
         currEmbed.setFooter({ text: estr });
         msg.channel.send({ embeds: [currEmbed] });
 
-        currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Member List');
+        currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Member List');
         for(let i = 0; i < users[index].dojo.guildList.length; i++) {
           let str = "<@" + users[index].dojo.guildList[i].userID + ">";
           currEmbed.addFields(
@@ -318,30 +388,30 @@ bot.on('messageCreate', async (msg) => {
           );
           if((i % 9 === 0 && i > 0) || i+1 >= users[index].dojo.guildList.length) {
             msg.channel.send({ embeds: [currEmbed] });
-            currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Member List');
+            currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Member List');
           }
         }
       }
     }
     else if(args.length === 2) {
       if(args[0] === 'pass' || args[0] === 'passleader') {
-        let tindex = getCharListIndex(args[1]);
+        let tindex = Helpers.getCharListIndex(args[1], users);
         if(tindex === null) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
           currEmbed.setDescription('Target is invalid.');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
 
         if(users[index].dojo.guildLeader.userID !== users[tindex].userID) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
           currEmbed.setDescription("You are not the dojo's master.");
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
 
         if(tindex === index) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
           currEmbed.setDescription('You cannot pass to yourself.');
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -352,13 +422,13 @@ bot.on('messageCreate', async (msg) => {
     else if(args.length > 2) {
       if(args[0] === 'create') {
         if(args.length < 3) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
           currEmbed.setDescription('dojo | dojo[members/disband] | dojo[invite/apply/kick/passleader][user] | dojo[create][name][guild style name]');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
         if(users[index].dojo !== null) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
           currEmbed.setDescription('You are already part of a dojo.');
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -380,7 +450,7 @@ bot.on('messageCreate', async (msg) => {
         let count = 0;
         for(let i = 2; i < args.length; i++) {
           if(args[i].toLowerCase() === 'style') {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
             currEmbed.setDescription('"Style" will be added to the end of your guild style automatically. Try again.');
             msg.channel.send({ embeds: [currEmbed] });
             return;
@@ -396,7 +466,7 @@ bot.on('messageCreate', async (msg) => {
         dojoList.push(users[index].dojo);
         loader.dojoSaver(dojoList);
 
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Successfully created: ' + users[index].dojo.guildName.replace(/\_/g,' '));
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Successfully created: ' + users[index].dojo.guildName.replace(/\_/g,' '));
         let estr = 'Total Members: ' + users[index].dojo.guildList.length + ' / ' + users[index].dojo.maxSize;
         let valueStr = 'Guild Leader: <@' + users[index].dojo.guildLeader.userID + '>';
         valueStr += '\nGuild Style Name: ' + users[index].dojo.guildStyle.replace(/\_/g,' ');
@@ -411,18 +481,18 @@ bot.on('messageCreate', async (msg) => {
 
 
   if(command === 'party') {
-    let index = findID(msg.author.id);
+    let index = Helpers.findID(msg.author.id, charList, users);
     if(index === -1) return;
 
     if(args.length === 0) {
       if(charList[index].party === null) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
         currEmbed.setDescription('This character is not in a party. Use party create [name] to make one.');
         msg.channel.send({ embeds: [currEmbed] });
         return;
       }
 
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(charList[index].party.partyName.replace(/\_/g,' ') + ' Character List');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(charList[index].party.partyName.replace(/\_/g,' ') + ' Character List');
       for(let i = 0; i < charList[index].party.partyList.length; i++) {
         let valueStr = 'Power Value: ' + (charList[index].party.partyList[i].level*charList[index].party.partyList[i].attributes.stotal).toLocaleString(undefined);
         valueStr += '\nStat Total: ' + charList[index].party.partyList[i].attributes.stotal.toLocaleString(undefined);
@@ -435,21 +505,21 @@ bot.on('messageCreate', async (msg) => {
       msg.channel.send({ embeds: [currEmbed] });
     }
     else if(args.length > 0) {
-      if(checkBattles(msg.author.id, charList[index].name) === 1) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+      if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
         currEmbed.setDescription('You cannot do this in battle.');
         msg.channel.send({ embeds: [currEmbed] });
         return;
       }
       if(args[0] === 'create') {
         if(args.length < 2) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
           currEmbed.setDescription('party | party[leave/disband/kick] | party[create/invite][name/user]');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
         if(charList[index].party !== null) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
           currEmbed.setDescription('This character is already in a party.');
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -468,7 +538,7 @@ bot.on('messageCreate', async (msg) => {
         partyList.push(charList[index].party);
         loader.partySaver(partyList);
 
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Successfully created: ' + charList[index].party.partyName.replace(/\_/g,' '));
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Successfully created: ' + charList[index].party.partyName.replace(/\_/g,' '));
         for(let i = 0; i < charList[index].party.partyList.length; i++) {
           let valueStr = 'Power Value: ' + (charList[index].party.partyList[i].level*charList[index].party.partyList[i].attributes.stotal).toLocaleString(undefined);
           valueStr += '\nStat Total: ' + charList[index].party.partyList[i].attributes.stotal.toLocaleString(undefined);
@@ -482,22 +552,22 @@ bot.on('messageCreate', async (msg) => {
       }
       else if(args[0] === 'apply') { 
         if(args.length !== 2) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
           currEmbed.setDescription('party | party[leave/disband/kick] | party[create/invite][name/user]');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
 
-        let tIndex = findID(args[1]);
+        let tIndex = Helpers.findID(args[1], charList, users);
         if(tIndex === -1 || charList[tIndex].party === null || charList[tIndex].party.partyLeader.name !== charList[tIndex].name 
             || charList[tIndex].party.partyLeader.playerID !== charList[tIndex].playerID) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
           currEmbed.setDescription("That is not a valid target to request an invite to a party.");
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
         if(charList[index].party !== null) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
           currEmbed.setDescription("You can't apply to be in a party while being in one.");
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -505,21 +575,21 @@ bot.on('messageCreate', async (msg) => {
         displayPartyInvite(charList[index],charList[tIndex], 0);
       }
       else if(charList[index].party === null) { 
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
         currEmbed.setDescription("You're not in a party.");
         msg.channel.send({ embeds: [currEmbed] });
         return;
       }
       else if(args[0] === 'invite') { 
         if(args.length !== 2) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
           currEmbed.setDescription('party | party[leave/disband/kick] | party[create/invite][name/user]');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
-        let tIndex = findID(args[1]);
+        let tIndex = Helpers.findID(args[1], charList, users);
         if(tIndex === -1) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
           currEmbed.setDescription("That is not a valid target to invite to a party.");
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -528,7 +598,7 @@ bot.on('messageCreate', async (msg) => {
         for(let i = 0; i < length; i++) {
           if(charList[index].party.partyList[i].name === charList[tIndex].name &&
             charList[index].party.partyList[i].playerID === charList[tIndex].playerID) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
             currEmbed.setDescription("That character is already in your party.");
             msg.channel.send({ embeds: [currEmbed] });
             return;
@@ -538,7 +608,7 @@ bot.on('messageCreate', async (msg) => {
       }
       else if(args.length == 1 && args[0] === 'kick') { 
         if(charList[index] < 2) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
           currEmbed.setDescription("There's no one to remove from the party.");
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -549,7 +619,7 @@ bot.on('messageCreate', async (msg) => {
       else if(args.length == 1 && args[0] === 'leave') { 
         if(charList[index].party.partyLeader.name === charList[index].name &&
           charList[index].party.partyLeader.playerID === charList[index].playerID) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
           currEmbed.setDescription("You can't leave a party you're leading.");
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -564,7 +634,7 @@ bot.on('messageCreate', async (msg) => {
           }
         }
         loader.partySaver(partyList);
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Success");
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Success");
         currEmbed.setDescription("You left your party.");
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -572,14 +642,14 @@ bot.on('messageCreate', async (msg) => {
       else if(args.length == 1 && args[0] === 'disband') { 
         if(charList[index].party.disbanding === 0) { 
           if(charList[index].party.partyLeader.name !== charList[index].name && charList[index].party.partyLeader.playerID !== charList[index].playerID) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
             currEmbed.setDescription("You're not the party leader.");
             msg.channel.send({ embeds: [currEmbed] });
             return;
           }
           else {
             charList[index].party.disbanding = 1;
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Are you sure?');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Are you sure?');
             currEmbed.setDescription('Use this command again to disband your team ' + charList[index].party.partyName.replace(/\_/g,' ') + '.');
             msg.channel.send({ embeds: [currEmbed] });
             return;
@@ -596,7 +666,7 @@ bot.on('messageCreate', async (msg) => {
           partyList.splice(pIndex,1);
           loader.partySaver(partyList);
 
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Done.');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Done.');
           currEmbed.setDescription('Your party has been disbanded.');
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -604,15 +674,39 @@ bot.on('messageCreate', async (msg) => {
       }
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('party | party[leave/disband/kick] | party[create/invite][name/user]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
     }
   }
 
+  if(command === 'improvetech' || command === 'techimprove') {
+    let index = Helpers.findID(msg.author.id, charList, users);
+    let userIndex = Helpers.getCharListIndex(msg.author.id, users);
+
+    if(index === -1 || userIndex === null) {
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('No Character Found');
+      currEmbed.setDescription('Please create a character first.');
+      msg.channel.send({ embeds: [currEmbed] });
+      return;
+    }
+    //todo
+    if (charList[index].techModify !== 0) {
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
+      currEmbed.setDescription("You are already modifying your techniques or style.");
+      msg.channel.send({ embeds: [currEmbed] });
+      return;
+    }
+
+    displayTechImprovement(charList[index], users[Helpers.getCharListIndex(msg.author.id, users)]);
+    loader.characterSaver(charList);
+    loader.userSaver(users);
+  }
+  
+
   if(command === 'style' || command === 'fightingstyle') {
-    let index = findID(msg.author.id);
+    let index = Helpers.findID(msg.author.id, charList, users);
     if(args.length === 0) {
       printStyle(charList[index]);
     }
@@ -629,27 +723,27 @@ bot.on('messageCreate', async (msg) => {
           printStyle(charList[index]);
         }
         else if(charList[index].fightingStyle.getTotalChange() > 0) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Fighting Style Already Set');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Fighting Style Already Set');
           currEmbed.setDescription('Use command: **style create [new name]** again to spend 25 technique points to rename it.');
           msg.channel.send({ embeds: [currEmbed] });
           charList[index].techModify = 1;
           return;
         }
         else if(args.length !== 5) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
           currEmbed.setDescription('style | style[npc/player] | style modify \nstyle create name [mainstat] [mainstat] [mainstat] | style create [new name]');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
         else if(charList[index].techniquePoints < 150) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Not Enough Technique Points');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Not Enough Technique Points');
           currEmbed.setDescription('You need 150 technique points to create a fighting style.');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
         else {
           if(args[2] === args[3] || args[2] === args[4] || args[3] === args[4]) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
             currEmbed.setDescription('You must choose three different mainstats when creating a fighting style.');
             msg.channel.send({ embeds: [currEmbed] });
             return;
@@ -657,21 +751,21 @@ bot.on('messageCreate', async (msg) => {
           else {
             if(args[4] !== 'str' && args[4] !== 'dex' && args[4] !== 'con' 
               && args[4] !== 'eng' && args[4] !== 'foc' && args[4] !== 'sol') {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
               currEmbed.setDescription('You must choose between [str,dex,con,eng,sol,foc].');
               msg.channel.send({ embeds: [currEmbed] });
               return;
             }
             else if(args[2] !== 'str' && args[2] !== 'dex' && args[2] !== 'con' 
               && args[2] !== 'eng' && args[2] !== 'foc' && args[2] !== 'sol') {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
               currEmbed.setDescription('You must choose between [str,dex,con,eng,sol,foc].');
               msg.channel.send({ embeds: [currEmbed] });
               return;
             }
             else if(args[3] !== 'str' && args[3] !== 'dex' && args[3] !== 'con' 
               && args[3] !== 'eng' && args[3] !== 'foc' && args[3] !== 'sol') {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
               currEmbed.setDescription('You must choose between [str,dex,con,eng,sol,foc].');
               msg.channel.send({ embeds: [currEmbed] });
               return;
@@ -717,28 +811,28 @@ bot.on('messageCreate', async (msg) => {
       else if(args[0] === "modify") {
         let cap = styleBonusCap + 50 * (parseInt(charList[index].potentialUnlocked) + parseInt(charList[index].potentialUnleashed));
         if(parseInt(charList[index].fightingStyle.getTotalChange()) >= cap) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
           currEmbed.setDescription('Your fighting style is already perfected!');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
 
-        if(checkBattles(msg.author.id, charList[index].name) === 1) {
+        if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
           msg.channel.send("You cannot do this in battle.");
           return;
         }
         else if(args.length !== 1 && args.length !== 2) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
           currEmbed.setDescription('style | style[npc/player] | style modify \nstyle create name [mainstat] [mainstat] [mainstat] | style create [new name]');
           msg.channel.send({ embeds: [currEmbed] });
           return;
         }
         else if(charList[index].fightingStyle.getTotalChange() > 0) {
           let styleCost = 0;
-          styleCost += calcStyleUpgrade(charList[index].fightingStyle,1);
+          styleCost += Helpers.calcStyleUpgrade(charList[index].fightingStyle,1);
           if(charList[index].techniquePoints >= styleCost) {
             if(charList[index].styleModify !== 0) {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
               currEmbed.setDescription("You are already modifying your fighting style.");
               msg.channel.send({ embeds: [currEmbed] });
               return;
@@ -746,14 +840,14 @@ bot.on('messageCreate', async (msg) => {
             displayModifyStyle(styleCost,charList[index],1);
           }
           else {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Not Enough Technique Points');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Not Enough Technique Points');
             currEmbed.setDescription('This takes ' + styleCost + ' technique points, but you only have ' + charList[index].techniquePoints + '.');
             msg.channel.send({ embeds: [currEmbed] });
             return;
           }
         }
         else {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('No Style');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('No Style');
           currEmbed.setDescription('Use style create [name] [mainstat] [mainstat] [mainstat] to create a fighting style first.');
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -765,7 +859,7 @@ bot.on('messageCreate', async (msg) => {
           allChars.push(npcList[i]);
         }
         for(let i = 0; i < users.length; i++) {
-          let index = findID(users[i].userID);
+          let index = Helpers.findID(users[i].userID, charList, users);
           allChars.push(charList[index]);
         }
         args[0] = args[0].replace("<","");
@@ -779,7 +873,7 @@ bot.on('messageCreate', async (msg) => {
         }).indexOf(args[0]);
 
         if(charI === -1) {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Character Not Found');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Character Not Found');
           currEmbed.setDescription('style | style[npc/player] | style modify \nstyle create name [mainstat] [mainstat] [mainstat] | style create [new name]');
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -791,15 +885,15 @@ bot.on('messageCreate', async (msg) => {
 
   if(command === 'battlebuffs' || command === 'teambuffs') {
     if(args.length === 0) {
-      let index = findID(msg.author.id);
-      let bcheck = getCurrentBattle(msg.author.id, charList[index].name);
+      let index = Helpers.findID(msg.author.id, charList, users);
+      let bcheck = Helpers.getCurrentBattle(msg.author.id, charList[index].name);
 
       if(index === -1) return;
       if(bcheck === -1) return;
 
       for(let j = 0; j < activeCombatList[bcheck].pCombatants.length; j++) {
         let char = activeCombatList[bcheck].pCombatants[j];
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Buff List: ' + char.name.replace(/\_/g,' '));
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Buff List: ' + char.name.replace(/\_/g,' '));
         currEmbed.addFields(
           { name: char.race.raceName.replace(/\_/g,' '), value: char.race.outputRacialBonus(), inline:true }
         );
@@ -815,15 +909,15 @@ bot.on('messageCreate', async (msg) => {
 
   if(command === 'enemybuffs') {
     if(args.length === 0) {
-      let index = findID(msg.author.id);
-      let bcheck = getCurrentBattle(msg.author.id, charList[index].name);
+      let index = Helpers.findID(msg.author.id, charList, users);
+      let bcheck = Helpers.getCurrentBattle(msg.author.id, charList[index].name);
 
       if(index === -1) return;
       if(bcheck === -1) return;
 
       for(let j = 0; j < activeCombatList[bcheck].NPCombatants.length; j++) {
         let char = activeCombatList[bcheck].NPCombatants[j];
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Buff List: ' + char.name.replace(/\_/g,' '));
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Buff List: ' + char.name.replace(/\_/g,' '));
         currEmbed.addFields(
           { name: char.race.raceName.replace(/\_/g,' '), value: char.race.outputRacialBonus(), inline:true }
         );
@@ -839,10 +933,10 @@ bot.on('messageCreate', async (msg) => {
 
   if(command === 'buffs') {
     if(args.length === 0) {
-      let index = findID(msg.author.id);
+      let index = Helpers.findID(msg.author.id, charList, users);
       if(index === -1) return;
 
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Buff List');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Buff List');
       currEmbed.addFields(
         { name: charList[index].race.raceName.replace(/\_/g,' '), value: charList[index].race.outputRacialBonus(), inline:true }
       );
@@ -859,7 +953,7 @@ bot.on('messageCreate', async (msg) => {
         allChars.push(npcList[i]);
       }
       for(let i = 0; i < users.length; i++) {
-        let index = findID(users[i].userID);
+        let index = Helpers.findID(users[i].userID, charList, users);
         allChars.push(charList[index]);
       }
       args[0] = args[0].replace("<","");
@@ -873,13 +967,13 @@ bot.on('messageCreate', async (msg) => {
       }).indexOf(args[0]);
 
       if(charI === -1) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Character Not Found');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Character Not Found');
         currEmbed.setDescription('buffs || buffs[npc/player]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
       }
 
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Buff List');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Buff List');
       currEmbed.addFields(
         { name: allChars[charI].race.raceName.replace(/\_/g,' ') + ' Benefits', value: allChars[charI].race.outputRacialBonus(), inline:true }
       );
@@ -891,7 +985,7 @@ bot.on('messageCreate', async (msg) => {
       msg.channel.send({ embeds: [currEmbed] });
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('buffs || buffs[npc/player]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -899,11 +993,11 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'shop') {
-    let cArr = getCharList(msg.author.id);
-    let index = findID(msg.author.id);
+    let cArr = Helpers.getCharList(msg.author.id, users);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(cArr!== null) {
-      if(checkBattles(msg.author.id, charList[index].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
@@ -918,40 +1012,40 @@ bot.on('messageCreate', async (msg) => {
 
   if(command === 'sellitem') {
     if(args.length == 3 ) { 
-      let cArr = getCharList(msg.author.id);
+      let cArr = Helpers.getCharList(msg.author.id, users);
       if(cArr!== null) {
-        let gArr = getCharList(args[2]);
+        let gArr = Helpers.getCharList(args[2], users);
         if(gArr !== null) {
           if(!isNaN(args[0]) && !isNaN(args[1]) && args[1] > 0) {
             if(args[0] > 0 && args[0] <= cArr.itemInventory.items.length) {
               displayOffer(cArr,gArr,args[1],cArr.itemInventory.items[args[0]-1]);
             }
             else {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
               currEmbed.setDescription('No item in that slot.');
               msg.channel.send({ embeds: [currEmbed] });
             }
           }
           else {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
             currEmbed.setDescription('sellitem[itemslot][amount][target]');
             msg.channel.send({ embeds: [currEmbed] });
           }
         }
         else {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Target');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Target');
           currEmbed.setDescription('Target has no characters.');
           msg.channel.send({ embeds: [currEmbed] });
         }
       }
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('No Characters');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('No Characters');
         currEmbed.setDescription('Please create a character first.');
         msg.channel.send({ embeds: [currEmbed] });
       }
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('sellitem[itemslot][amount][target]');
       msg.channel.send({ embeds: [currEmbed] });
     }
@@ -959,7 +1053,7 @@ bot.on('messageCreate', async (msg) => {
 
   if(command === 'affixitem' || command === 'addaffix' || command === 'affix') {
     if(args.length == 1 ) { 
-      let cArr = getCharList(msg.author.id);
+      let cArr = Helpers.getCharList(msg.author.id, users);
       if(cArr!== null) {
         if(!isNaN(args[0])) {
           if(args[0] > 0 && args[0] <= cArr.itemInventory.items.length) {
@@ -968,32 +1062,32 @@ bot.on('messageCreate', async (msg) => {
             }
             else {
               printItem(cArr.itemInventory.items[args[0]-1]);
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Cannot Affix');
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Cannot Affix');
               currEmbed.setDescription("This item has reached it's maximum for affixing.");
               msg.channel.send({ embeds: [currEmbed] });
               return;
             }
           }
           else {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
             currEmbed.setDescription('No item in that slot.');
             msg.channel.send({ embeds: [currEmbed] });
           }
         }
         else {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
           currEmbed.setDescription('affixitem[itemslot]');
           msg.channel.send({ embeds: [currEmbed] });
         }
       }
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('No Characters');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('No Characters');
         currEmbed.setDescription('Please create a character first.');
         msg.channel.send({ embeds: [currEmbed] });
       }
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('affixitem[itemslot]');
       msg.channel.send({ embeds: [currEmbed] });
     }
@@ -1001,15 +1095,15 @@ bot.on('messageCreate', async (msg) => {
 
   if(command === 'givezeni' || command === 'gib') {
     if(args.length == 2 ) { 
-      let cArr = getCharList(msg.author.id);
+      let cArr = Helpers.getCharList(msg.author.id, users);
       if(cArr !== null) {
-        let gArr = getCharList(args[1]);
+        let gArr = Helpers.getCharList(args[1], users);
         if(gArr !== null) {
           if(!isNaN(args[0])) {
             if(args[0] < cArr.zeni && args[0] > 0)
             {
               if(cArr.tutorial === 1 || gArr.tutorial === 1 ) {
-                let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Slow Down!');
+                let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Slow Down!');
                 currEmbed.setDescription("Follow the tutorial to the end before doing this.");
                 msg.channel.send({ embeds: [currEmbed] });
                 return;
@@ -1022,75 +1116,63 @@ bot.on('messageCreate', async (msg) => {
               msg.channel.send("<@" + gArr.userID + "> was sent money.");
             }
             else {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
               currEmbed.setDescription("You can't give that much zeni.");
               msg.channel.send({ embeds: [currEmbed] });
             }
           }
           else {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
             currEmbed.setDescription('givezeni[amount][target]');
             msg.channel.send({ embeds: [currEmbed] });
           }
         }
         else {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Target');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Target');
           currEmbed.setDescription('Target has no characters.');
           msg.channel.send({ embeds: [currEmbed] });
         }
       }
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('No Characters');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('No Characters');
         currEmbed.setDescription('Please create a character first.');
         msg.channel.send({ embeds: [currEmbed] });
       }
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('givezeni[amount][target]');
       msg.channel.send({ embeds: [currEmbed] });
     }
   }
 
   if(command === 'profile' || command === 'user' || command === 'mychars' || command === 'mychar') {
-    let cArr = getCharList(msg.author.id);
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(msg.author.username);
-    currEmbed.setThumbnail(msg.author.avatarURL());
-    if(cArr !== null) {
-      for(let i = 0; i < cArr.charIDs.length; i++) {
-        let str = charList[cArr.charIDs[i]].name + ', ' + charList[cArr.charIDs[i]].race.raceName.replace(/\_/g,' ') + '\nPower Value: ' + (charList[cArr.charIDs[i]].level*charList[cArr.charIDs[i]].attributes.stotal).toLocaleString(undefined);
-        str += '\nStat Total: ' + charList[cArr.charIDs[i]].attributes.stotal.toLocaleString(undefined);
-        if(charList[cArr.charIDs[i]].training > 0) str += '\nTraining for ' + charList[cArr.charIDs[i]].training.toLocaleString(undefined) + ' more hours';
-        currEmbed.addField('Character ' + (1+i), str);
-      }
-      currEmbed.setFooter({ text: 'You have ' + cArr.zeni.toLocaleString(undefined) + ' zeni' });
-      msg.channel.send({ embeds: [currEmbed] });
-    }
+    viewProfile();
   }
 
   if(command === 'setcharimage') {
-    if(args.length == 1 && isImage(args[0])) { 
-      let index = findID(msg.author.id);
+    if(args.length == 1 && Helpers.isImage(args[0])) { 
+      let index = Helpers.findID(msg.author.id, charList, users);
       charList[index].image = args[0];
       loader.characterSaver(charList);
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('setcharimage[imageURL]');
       msg.channel.send({ embeds: [currEmbed] });
     }
   }
 
   if(command === 'setchar') {
-    let index = getCharListIndex(msg.author.id);
+    let index = Helpers.getCharListIndex(msg.author.id, users);
      if(index !== null) {
-      /*if(checkBattles(msg.author.id, charList[index].name) === 1) {
+      /*if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }*/
 
       if(args[0] === null || isNaN(args[0])) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('setchar[index]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -1105,8 +1187,90 @@ bot.on('messageCreate', async (msg) => {
      }
   }
 
+  if(command === 'deletechar' || command === 'chardelete') {
+    let index = Helpers.findID(msg.author.id, charList, users);
+
+    if(args.length == 1 && !isNaN(args[0])) { 
+      let newOne = -1;
+      let arg2 = args[0] - 1;
+      for(let i = 0; i < users.length; i++) {
+        if(users[i].userID === msg.author.id) {
+          newOne = i;
+        }
+      }
+
+      if(users[newOne].charIDs.length <= arg2 || 0 > arg2) {
+        msg.channel.send("Not a valid slot.")
+        return;
+      }
+
+      if(newOne === -1) {
+        msg.channel.send("You have no characters.")
+        return;
+      }
+
+      if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
+        msg.channel.send("You cannot do this in battle.");
+        return;
+      }
+
+      let OR = users[newOne].overwrite(arg2);
+      if(OR === null || OR === -1) {
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(charList[users[newOne].charIDs[arg2]].name.replace(/\_/g,' '));
+        if(charList[users[newOne].charIDs[arg2]].image === '' || charList[users[newOne].charIDs[arg2]].image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
+        else { currEmbed.setThumbnail(charList[users[newOne].charIDs[arg2]].image); }
+        currEmbed.addFields(
+          { name: 'Are you sure?', value: 'Equipped items will be lost. Re-enter command to confirm.', inline:true }
+          );
+        msg.channel.send({ embeds: [currEmbed] });
+        return;
+      }
+
+
+      msg.channel.send(charList[users[newOne].charIDs[arg2]].name + ' was deleted.');
+
+      if(charList[users[newOne].charIDs[arg2]].party !== null && charList[users[newOne].charIDs[arg2]].name === charList[users[newOne].charIDs[arg2]].party.partyLeader.name &&
+        charList[users[newOne].charIDs[arg2]].playerID === charList[users[newOne].charIDs[arg2]].party.partyLeader.playerID) {
+          let pIndex = partyList.map(function(e) { return e.partyName+e.partyLeader.name; }).indexOf(charList[users[newOne].charIDs[arg2]].party.partyName+charList[users[newOne].charIDs[arg2]].name);
+          let length = charList[users[newOne].charIDs[arg2]].party.partyList.length;
+          for(let i = 0; i < length; i++) {
+            if(charList[users[newOne].charIDs[arg2]].name+charList[users[newOne].charIDs[arg2]].playerID !== charList[users[newOne].charIDs[arg2]].party.partyList[i].name+charList[users[newOne].charIDs[arg2]].party.partyList[i].playerID) {
+              charList[users[newOne].charIDs[arg2]].party.partyList[i].party = null;
+            } 
+          }
+          charList[users[newOne].charIDs[arg2]].party = null;
+          partyList.splice(pIndex,1);
+      } 
+      else if(charList[users[newOne].charIDs[arg2]].party !== null) charList[users[newOne].charIDs[arg2]].party.removeCharacter(charList[users[newOne].charIDs[arg2]]);
+
+      //charList[users[newOne].charIDs[arg2]] = null;
+      charList.splice(users[newOne].charIDs[arg2],1);
+      let ci = users[newOne].charIDs[arg2];
+      for(let i = 0; i < users.length; i++) {
+        for(let j = 0; j < users[i].charIDs.length; j++) {
+          if(users[i].charIDs[j] > ci) {
+            users[i].charIDs[j] -= 1;
+          }
+        }
+      } 
+      users[newOne].charIDs.splice(arg2,1);
+      users[newOne].currentChar = 0;
+      console.log(users[newOne].charIDs);
+    }
+    else {
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
+      currEmbed.setDescription('deletechar[index]');
+      msg.channel.send({ embeds: [currEmbed] });
+    }
+
+    loader.partySaver(partyList);
+    loader.characterSaver(charList);
+    loader.userSaver(users);
+    loader.styleSaver(npcList, charList);
+  }
+
   if(command === 'overwrite') {
-    let index = findID(msg.author.id);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length == 3 && !isNaN(args[2])) { 
       let newOne = -1;
@@ -1133,21 +1297,21 @@ bot.on('messageCreate', async (msg) => {
       else {
         for(let i = 0; i < users[newOne].charIDs.length; i++) {
           if(charList[users[newOne].charIDs[i]].name === c.name && i !== arg2) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
             currEmbed.setDescription('You already have a character with that name!');
             msg.channel.send({ embeds: [currEmbed] });
             return
           }
         }
       }
-      if(checkBattles(msg.author.id, charList[index].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
 
       let OR = users[newOne].overwrite(arg2);
       if(OR === null || OR === -1) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(charList[users[newOne].charIDs[arg2]].name.replace(/\_/g,' '));
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(charList[users[newOne].charIDs[arg2]].name.replace(/\_/g,' '));
         if(charList[users[newOne].charIDs[arg2]].image === '' || charList[users[newOne].charIDs[arg2]].image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
         else { currEmbed.setThumbnail(charList[users[newOne].charIDs[arg2]].image); }
         currEmbed.addFields(
@@ -1180,7 +1344,7 @@ bot.on('messageCreate', async (msg) => {
       charList[users[newOne].charIDs[arg2]] = c;
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('overwrite[name][race][index]');
       msg.channel.send({ embeds: [currEmbed] });
     }
@@ -1221,7 +1385,7 @@ bot.on('messageCreate', async (msg) => {
         users.push(new User(msg.author.id, inv));
         users[newOne].charIDs.push((charList.length));
         users[newOne].addTag('28');
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Welcome to Zeno RPG!');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Welcome to Zeno RPG!');
         currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png")
         currEmbed.setDescription("Please use *g statup[statname][amount]* before you begin! If you follow the tutorial to the end, you'll get a nice reward.");
         msg.channel.send({ embeds: [currEmbed] });
@@ -1229,7 +1393,7 @@ bot.on('messageCreate', async (msg) => {
       else {
         for(let i = 0; i < users[newOne].charIDs.length; i++) {
           if(charList[users[newOne].charIDs[i]].name === name) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
             currEmbed.setDescription('You already have a character with that name!');
             msg.channel.send({ embeds: [currEmbed] });
             return
@@ -1251,7 +1415,7 @@ bot.on('messageCreate', async (msg) => {
       charList.push(c);
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('newchar[name][race]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1264,17 +1428,17 @@ bot.on('messageCreate', async (msg) => {
 
 //todo: interface
   if(command === 'statup') {
-    let index = findID(msg.author.id);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 2) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('statup[stat][amount]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
     }
 
-    if(checkBattles(msg.author.id, charList[index].name) === 1) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+    if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
       currEmbed.setDescription('You cannot do this in battle.');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1283,7 +1447,7 @@ bot.on('messageCreate', async (msg) => {
     if(index === -1) {
     }
     else if(charList[index].statPoints < Number(args[1])) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
       currEmbed.setDescription("You don't have that many stat points to use.");
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1325,16 +1489,16 @@ bot.on('messageCreate', async (msg) => {
       msg.channel.send("Done.");
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
       currEmbed.setDescription("That is not a mainstat, or you're trying to go above a stat cap.");
       msg.channel.send({ embeds: [currEmbed] });
       return;
     }
 
-    let uI = getCharListIndex(msg.author.id);
+    let uI = Helpers.getCharListIndex(msg.author.id, users);
     if(uI !== null && users[uI].tutorial === 1) {
       let str = Help.tutorial(1);
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Tutorial');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Tutorial');
       currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png")
       currEmbed.setDescription(str);
       msg.channel.send({ embeds: [currEmbed] });
@@ -1344,8 +1508,8 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'inventory' || command === 'inv') {
-    let uid = getCharListIndex(msg.author.id);
-    let index = findID(msg.author.id);
+    let uid = Helpers.getCharListIndex(msg.author.id, users);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(index === -1 || uid === null) {
     }
@@ -1366,7 +1530,7 @@ bot.on('messageCreate', async (msg) => {
             users[uid].itemInventory.items.sort(function(a,b) {return b.attbonus.getTotalChange() - a.attbonus.getTotalChange()});
           }
           else if (args.length !== 1) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
             currEmbed.setDescription('inv | inv sort | inv sort [name|quality|affixes|totalbonus]');
             msg.channel.send({ embeds: [currEmbed] });
             return;
@@ -1374,7 +1538,7 @@ bot.on('messageCreate', async (msg) => {
           loader.inventorySaver(invList);
         }
         else if(args.length > 0 && args[0] !== "sort") {
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
           currEmbed.setDescription('inv | inv sort | inv sort [name|quality|affixes|bonustotal]');
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -1386,11 +1550,11 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'trashitem') {
-    let uid = getCharListIndex(msg.author.id);
-    let index = findID(msg.author.id);
+    let uid = Helpers.getCharListIndex(msg.author.id, users);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 1) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('trashitem[invslot]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1407,7 +1571,7 @@ bot.on('messageCreate', async (msg) => {
       printInventory(uid);
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('No item found at given ID.');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('No item found at given ID.');
       currEmbed.setDescription('Items in slots 1 to ' + users[uid].itemInventory.items.length);
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1418,11 +1582,11 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'viewitem' || command === 'itemview') {
-    let uid = getCharListIndex(msg.author.id);
-    let index = findID(msg.author.id);
+    let uid = Helpers.getCharListIndex(msg.author.id, users);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 1) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('viewitem[invslot]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1438,11 +1602,11 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'equipitem' || command === 'equip') {
-    let uid = getCharListIndex(msg.author.id);
-    let index = findID(msg.author.id);
+    let uid = Helpers.getCharListIndex(msg.author.id, users);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 1) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('equipitem[invslot]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1451,7 +1615,7 @@ bot.on('messageCreate', async (msg) => {
     if(index === -1 || uid === null) {
     }
     else if(!isNaN(args[0]) && args[0] > 0 && args[0] <= users[uid].itemInventory.items.length) {
-      if(checkBattles(msg.author.id, charList[index].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
@@ -1479,7 +1643,7 @@ bot.on('messageCreate', async (msg) => {
           charList[index].removeBuff(buffID);
         }
       }
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Equipped");
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Equipped");
       let wName;
       let dName;
       if(charList[index].weapon === null) wName = "Empty"
@@ -1497,7 +1661,7 @@ bot.on('messageCreate', async (msg) => {
       if(users[uid].tutorial === 1) {
         users[uid].tutorialNearEnd = 1;
         let str = Help.tutorial(4);
-        let newEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Tutorial');
+        let newEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Tutorial');
         newEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png")
         newEmbed.setDescription(str);
         msg.channel.send({ embeds: [newEmbed] });
@@ -1508,7 +1672,7 @@ bot.on('messageCreate', async (msg) => {
       loader.itemSaver(itemList);
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('equipitem[invslot]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1516,11 +1680,11 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'unequipitem' || command === 'unequip') {
-    let uid = getCharListIndex(msg.author.id);
-    let index = findID(msg.author.id);
+    let uid = Helpers.getCharListIndex(msg.author.id, users);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 1) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('unequipitem[Dogi/Weapon]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1529,13 +1693,13 @@ bot.on('messageCreate', async (msg) => {
     if(index === -1 || uid === null) {
     }
     else if (users[uid].itemInventory.items.length >= users[uid].itemInventory.maxSize) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Inventory Full');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Inventory Full');
       currEmbed.setDescription("You don't have space in your inventory for this item.");
       msg.channel.send({ embeds: [currEmbed] });
       return;
     }
     else if(isNaN(args[0])) {
-      if(checkBattles(msg.author.id, charList[index].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
@@ -1551,7 +1715,7 @@ bot.on('messageCreate', async (msg) => {
         charList[index].weapon = null;
         charList[index].statusUpdate(0);
       }
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Equipped");
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Equipped");
       let wName;
       let dName;
       if(charList[index].weapon === null) wName = "Empty"
@@ -1571,7 +1735,7 @@ bot.on('messageCreate', async (msg) => {
       loader.itemSaver(itemList);
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('unequipitem[Dogi/Weapon]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1580,13 +1744,13 @@ bot.on('messageCreate', async (msg) => {
 
   if(command === 'viewequips' || command === "equips") {
     if(args.length === 0) {
-      let uid = getCharListIndex(msg.author.id);
-      let index = findID(msg.author.id);
+      let uid = Helpers.getCharListIndex(msg.author.id, users);
+      let index = Helpers.findID(msg.author.id, charList, users);
 
       if(index === -1 || uid === null) {
       }
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Equipped");
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Equipped");
         let wName;
         let dName;
         if(charList[index].weapon === null) {
@@ -1618,7 +1782,7 @@ bot.on('messageCreate', async (msg) => {
         allChars.push(npcList[i]);
       }
       for(let i = 0; i < users.length; i++) {
-        let index = findID(users[i].userID);
+        let index = Helpers.findID(users[i].userID, charList, users);
         allChars.push(charList[index]);
       }
       args[0] = args[0].replace("<","");
@@ -1632,13 +1796,13 @@ bot.on('messageCreate', async (msg) => {
       }).indexOf(args[0]);
 
       if(charI === -1) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Character Not Found');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Character Not Found');
         currEmbed.setDescription('equips || equips[npc/player]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
       }
 
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(allChars[charI].name + "'s Equipped Items");
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(allChars[charI].name + "'s Equipped Items");
       let wName;
       let dName;
       if(allChars[charI].weapon === null) {
@@ -1664,7 +1828,7 @@ bot.on('messageCreate', async (msg) => {
       if(wName !== "Empty") printItem(allChars[charI].weapon);
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('equips || equips[npc/player]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1672,13 +1836,13 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'viewweapon') {
-    let uid = getCharListIndex(msg.author.id);
-    let index = findID(msg.author.id);
+    let uid = Helpers.getCharListIndex(msg.author.id, users);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(index === -1 || uid === null) {
     }
     else if(charList[index].weapon === null) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("No Weapon Equipped");
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("No Weapon Equipped");
       msg.channel.send({ embeds: [currEmbed] });
     }
     else {
@@ -1687,13 +1851,13 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'viewdogi' || command === 'viewarmor') {
-    let uid = getCharListIndex(msg.author.id);
-    let index = findID(msg.author.id);
+    let uid = Helpers.getCharListIndex(msg.author.id, users);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(index === -1 || uid === null) {
     }
     else if(charList[index].dogi === null) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("No Dogi Equipped");
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("No Dogi Equipped");
       msg.channel.send({ embeds: [currEmbed] });
     }
     else {
@@ -1702,7 +1866,7 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'unlockedtech' || command === 'utech') {
-    let index = getCharListIndex(msg.author.id);
+    let index = Helpers.getCharListIndex(msg.author.id, users);
 
     if(index === null) {
     }
@@ -1712,7 +1876,7 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'currenttech' || command === 'ctech') {
-    let index = findID(msg.author.id);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(index === -1) {
     }
@@ -1722,11 +1886,11 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'settransformation' || command === 'settrans') {
-    let index = getCharListIndex(msg.author.id);
-    let i = findID(msg.author.id);
+    let index = Helpers.getCharListIndex(msg.author.id, users);
+    let i = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 1 || isNaN(args[0])) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('settransformation[techid]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1746,7 +1910,7 @@ bot.on('messageCreate', async (msg) => {
       return;
     }
     else {
-      if(checkBattles(msg.author.id, charList[i].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[i].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
@@ -1759,13 +1923,13 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'removetransformation' || command === 'rtrans') {
-    let index = findID(msg.author.id);
-    let i = findID(msg.author.id);
+    let index = Helpers.findID(msg.author.id, charList, users);
+    let i = Helpers.findID(msg.author.id, charList, users);
 
     if(index === null) {
     }
     else {
-      if(checkBattles(msg.author.id, charList[i].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[i].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
@@ -1778,11 +1942,11 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'settech') {
-    let index = getCharListIndex(msg.author.id);
-    let i = findID(msg.author.id);
+    let index = Helpers.getCharListIndex(msg.author.id, users);
+    let i = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 1 || isNaN(args[0])) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('settech[techid]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -1795,7 +1959,7 @@ bot.on('messageCreate', async (msg) => {
       return;
     }
     else {
-      if(checkBattles(msg.author.id, charList[i].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[i].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
@@ -1807,8 +1971,8 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'removetech' || command === 'rtech' || command === 'unsettech') {
-    let index = findID(msg.author.id);
-    let i = findID(msg.author.id);
+    let index = Helpers.findID(msg.author.id, charList, users);
+    let i = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 1 || isNaN(args[0])) {
       msg.channel.send("removetech[removeid]");
@@ -1821,7 +1985,7 @@ bot.on('messageCreate', async (msg) => {
       if(args[0] <= 0 || args[0] > charList[index].techniques.length) {
         msg.channel.send("Index out of range.");
       }
-      if(checkBattles(msg.author.id, charList[i].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[i].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
@@ -1838,7 +2002,7 @@ bot.on('messageCreate', async (msg) => {
   }
 
   if(command === 'swaptech') {
-    let index = findID(msg.author.id);
+    let index = Helpers.findID(msg.author.id, charList, users);
 
     if(args.length !== 2 || isNaN(args[0]) || isNaN(args[1])) {
       msg.channel.send("swaptech[swapfromid][swaptoid]");
@@ -1848,7 +2012,7 @@ bot.on('messageCreate', async (msg) => {
     if(index === null) {
     }
     else {
-      if(checkBattles(msg.author.id, charList[index].name) === 1) {
+      if(Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
         msg.channel.send("You cannot do this in battle.");
         return;
       }
@@ -1863,14 +2027,14 @@ bot.on('messageCreate', async (msg) => {
   if(command === 'deaths') {
     let index
     if(args.length != 0) {
-      index = findID(args[0]);
+      index = Helpers.findID(args[0], charList, users);
     }
     else {
-      index = findID(msg.author.id);
+      index = Helpers.findID(msg.author.id, charList, users);
     }
     
     if(index != -1 || index != null) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(charList[index].name.replace(/\_/g,' '));
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(charList[index].name.replace(/\_/g,' '));
       if(charList[index].image === '' || charList[index].image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
       else { currEmbed.setThumbnail(charList[index].image); }
       currEmbed.addFields(
@@ -1883,10 +2047,10 @@ bot.on('messageCreate', async (msg) => {
   if(command === 'status' || command === 'stat' || command === 'char') {
     let index
     if(args.length === 1) {
-      index = findID(args[0]);
+      index = Helpers.findID(args[0], charList, users);
     }
     else if(args.length === 0)  {
-      index = findID(msg.author.id);
+      index = Helpers.findID(msg.author.id, charList, users);
     }
 
     if(index !== -1 && index !== null) {
@@ -1895,12 +2059,12 @@ bot.on('messageCreate', async (msg) => {
       loader.characterSaver(charList);
     }
     else {
-      index = findNPCID(args[0]);
+      index = Helpers.findNPCID(args[0], npcList);
       if(index != -1) {
         printStat(npcList[index]);
       }
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('stat[user/npcname] || stat');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -1911,10 +2075,10 @@ bot.on('messageCreate', async (msg) => {
   if(command === 'advstatus' || command === 'astatus' || command === 'astat' || command === 'achar') {
     let index
     if(args.length != 0) {
-      index = findID(args[0]);
+      index = Helpers.findID(args[0], charList, users);
     }
     else {
-      index = findID(msg.author.id);
+      index = Helpers.findID(msg.author.id, charList, users);
     }
     
     if(index != -1) {
@@ -1923,17 +2087,41 @@ bot.on('messageCreate', async (msg) => {
       loader.characterSaver(charList);
     }
     else {
-      index = findNPCID(args[0]);
+      index = Helpers.findNPCID(args[0], npcList);
       if(index != -1) {
         printAStat(npcList[index]);
         charTechPrint(npcList[index]);
       }
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('advstatus[userid/npcname]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
       }
+    }
+  }
+
+  if(command === 'battlestatus' || command === 'bstatus' || command === 'bstat' || command === 'bchar') {
+    let index
+    if(args.length != 0) {
+      index = Helpers.findID(args[0], charList, users);
+    }
+    else {
+      index = Helpers.findID(msg.author.id, charList, users);
+    }
+
+
+    if(index != -1 && Helpers.checkBattles(msg.author.id, charList[index].name) === 1) {
+      let c = Helpers.getCurrentBattleCopy(msg.author.id, charList[index].name)
+      printAStat(c);
+      charTechPrint(c);
+      loader.characterSaver(charList);
+    }
+    else {
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Not in Battle');
+      currEmbed.setDescription('This command cannot be used outside battle.');
+      msg.channel.send({ embeds: [currEmbed] });
+      return;
     }
   }
 
@@ -1943,8 +2131,8 @@ bot.on('messageCreate', async (msg) => {
 
 
 if(command === 'currentbattle' || command === 'viewbattle') {    
-  let pci = findID(msg.author.id);
-  let bcheck = getCurrentBattle(msg.author.id, charList[pci].name);
+  let pci = Helpers.findID(msg.author.id, charList, users);
+  let bcheck = Helpers.getCurrentBattle(msg.author.id, charList[pci].name);
 
   if(pci === null) {
     return;
@@ -1954,7 +2142,7 @@ if(command === 'currentbattle' || command === 'viewbattle') {
     printBattleList(activeCombatList[bcheck],1);
   }
   else {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
     currEmbed.setDescription('Character not in battle.');
     msg.channel.send({ embeds: [currEmbed] });
     return;
@@ -1965,15 +2153,15 @@ if(command === "suppress") {
   let pc = 0;
   if(args.length !== 0) {
     if(args.length !== 1 || isNaN(args[0])) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('Exact: suppress[reduction percent]\nAuto adjust: suppress');
       msg.channel.send({ embeds: [currEmbed] });
       return;
     }
   }
 
-  let pci = findID(msg.author.id);
-  let bcheck = getCurrentBattle(msg.author.id, charList[pci].name);
+  let pci = Helpers.findID(msg.author.id, charList, users);
+  let bcheck = Helpers.getCurrentBattle(msg.author.id, charList[pci].name);
 
   if(pci === null) {
     return;
@@ -2132,7 +2320,7 @@ if(command === "suppress") {
 
 if(command === "battle") {
   if(args.length !== 1 || !isNaN(args[0])) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
     currEmbed.setDescription('battle[easy,normal,hard,challenge]');
     msg.channel.send({ embeds: [currEmbed] });
     return;
@@ -2140,30 +2328,30 @@ if(command === "battle") {
   if(args[0] != "easy" && args[0] != "normal" && args[0] != "hard" && args[0] != "challenge") args[0] = "normal";
 
 
-  let check = getCharListIndex(msg.author.id);
-  let pci = findID(msg.author.id);
+  let check = Helpers.getCharListIndex(msg.author.id, users);
+  let pci = Helpers.findID(msg.author.id, charList, users);
   if(check === null || pci === -1) return;
   if(users[check].shopping !== 0 || users[check].affixing !== 0 || charList[pci].training > 0) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('You are already busy.');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('You are already busy.');
     currEmbed.setDescription("Finish what you're doing before picking fights.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
 
-  if(checkBattles(msg.author.id, charList[pci].name) === 1) {
+  if(Helpers.checkBattles(msg.author.id, charList[pci].name) === 1) {
     msg.channel.send("You cannot be in more than one battle at a time.");
     return;
   }
 
   if(charList[pci].attributes.stotal <= 1) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Hold up!');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Hold up!');
     currEmbed.setDescription("Please use statup[statname][amount] at least once before going into a battle.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
 
   if(args[0] === "challenge" && (charList[pci].attributes.stotal < 100 || charList[pci].level < 100)) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error.');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error.');
     currEmbed.setDescription("You must have 100 stat total or more, as well as at least 100 levels to attempt challenge difficulty.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
@@ -2407,8 +2595,8 @@ if(command === "battle") {
   enemy.unleashPotential(charList[pci].potentialUnleashed);
   if(charList[pci].potentialUnleashed == 1) mod *= 1.5;
   if(args[0] === 'challenge' || args[0] === 'hard') {
-    enemy.weapon = makeItem("weapon","legendary");
-    if(args[0] === 'challenge') enemy.dogi = makeItem("dogi","legendary");
+    enemy.weapon = Helpers.makeItem("weapon","legendary", itemList);
+    if(args[0] === 'challenge') enemy.dogi = Helpers.makeItem("dogi","legendary", itemList);
   }
   enemy.statusUpdate(0);
   enemy.addBuff(enemy.style);
@@ -2471,55 +2659,55 @@ if(command === "battle") {
 
 if(command === "spar") {
   if((args.length !== 2 && args.length !== 1) || !isNaN(args[0])) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
     currEmbed.setDescription('spar[target]' || 'spar[target][zeni risk]');
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
 
-  let pci = findID(msg.author.id);
-  let eci = findID(args[0]);
-  let check = getCharListIndex(msg.author.id);
+  let pci = Helpers.findID(msg.author.id), charList, users;
+  let eci = Helpers.findID(args[0], charList, users);
+  let check = Helpers.getCharListIndex(msg.author.id, users);
 
   if(check === null || pci === -1 || eci === -1)  {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
     currEmbed.setDescription('spar[target]' || 'spar[target][zeni risk]');
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
 
   if(users[check].shopping !== 0 || users[check].affixing !== 0 || charList[pci].training > 0) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('You are already busy.');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('You are already busy.');
     currEmbed.setDescription("Finish what you're doing before picking fights.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
 
   if(users[check].tutorial === 1) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Slow Down!');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Slow Down!');
     currEmbed.setDescription("Follow the tutorial to the end before doing this.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
 
   if(pci === eci) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
     currEmbed.setDescription("You can't challenge yourself!");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
   else if(args.length === 2 && isNaN(args[1]) && args[1] > 0) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format:Zeni Risk');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format:Zeni Risk');
     currEmbed.setDescription('spar[target]' || 'spar[target][zeni risk]');
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
   else {
-    let challenger = getCharList(msg.author.id);
-    let challenged = getCharList(args[0]);
+    let challenger = Helpers.getCharList(msg.author.id, users);
+    let challenged = Helpers.getCharList(args[0], users);
     if(isNaN(args[1]) || (challenger.zeni > args[1] && challenged.zeni > args[1])) {
       if(charList[pci].attributes.stotal <= 1 || charList[eci].attributes.stotal <= 1 ) {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Hold up!');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Hold up!');
         currEmbed.setDescription("Please use statup[statname][amount] at least once before going into a battle.");
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -2528,7 +2716,7 @@ if(command === "spar") {
       displayChallenge(challenger, challenged, args[1], pci, eci);
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
       currEmbed.setDescription("One or both players don't have that amount of zeni to risk.");
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -2538,31 +2726,31 @@ if(command === "spar") {
 
 if(command === "npcspar") {
   if(args.length !== 1 || !isNaN(args[0])) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
     currEmbed.setDescription('npcspar[npcname]');
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
-  let npci = findNPCID(args[0]);
+  let npci = Helpers.findNPCID(args[0], npcList);
   if(npci === null || npci === -1) return;
-  let pci = findID(msg.author.id);
+  let pci = Helpers.findID(msg.author.id, charList, users);
   if(pci === null || pci === -1) return;
 
-  let check = getCharListIndex(msg.author.id);
+  let check = Helpers.getCharListIndex(msg.author.id, users);
   if(users[check].shopping !== 0 || users[check].affixing !== 0 || charList[pci].training > 0) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('You are already busy.');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('You are already busy.');
     currEmbed.setDescription("Finish what you're doing before picking fights.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
 
   if(charList[pci].attributes.stotal <= 1) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Hold up!');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Hold up!');
     currEmbed.setDescription("Please use statup[statname][amount] at least once before going into a battle.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
-  if(checkBattles(msg.author.id, charList[pci].name) === 1) {
+  if(Helpers.checkBattles(msg.author.id, charList[pci].name) === 1) {
     msg.channel.send("You cannot be in more than one battle at a time.");
     return;
   }
@@ -2577,7 +2765,7 @@ if(command === "npcspar") {
 
 if(command === "trial") {
   if(args.length !== 1) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Training');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Training');
     currEmbed.setDescription("Trials are static solo encounters for characters, designed similar to raids, that provide special rewards. They are always at least level 400, so it's recommend to be at least that high level before attempting it. \nThey can be started with trial [name]");
     currEmbed.addFields(
       { name: 'Name: Krillin', value: "A quick training session with Krillin! Designed for characters with at least 400 total stats.", inline:true },
@@ -2585,7 +2773,7 @@ if(command === "trial") {
       { name: '\u200b', value: '\u200b', inline:true },
       );
     msg.channel.send({ embeds: [currEmbed] });
-    currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Trials');
+    currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Trials');
     currEmbed.setDescription("Trials are static solo encounters for characters, designed similar to raids, that provide special rewards. They are always at least level 400, so it's recommend to be at least that high level before attempting it. \nThey can be started with trial [name]");
     currEmbed.addFields(
       { name: 'Name: Sage', value: "The Namekian Sage's trial is designed to test whether a character is ready to unlock their potential. This encounter is designed for characters with at least 800 total stats.", inline:true },
@@ -2600,24 +2788,24 @@ if(command === "trial") {
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
-  let pci = findID(msg.author.id);
+  let pci = Helpers.findID(msg.author.id, charList, users);
   if(pci === null || pci === -1) return;
 
-  let check = getCharListIndex(msg.author.id);
+  let check = Helpers.getCharListIndex(msg.author.id, users);
   if(users[check].shopping !== 0 || users[check].affixing !== 0 || charList[pci].training > 0) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('You are already busy.');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('You are already busy.');
     currEmbed.setDescription("Finish what you're doing before picking fights.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
 
   if(charList[pci].attributes.stotal <= 1) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Hold up!');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Hold up!');
     currEmbed.setDescription("Please use statup[statname][amount] at least once before going into a battle.");
     msg.channel.send({ embeds: [currEmbed] });
     return;
   }
-  if(checkBattles(msg.author.id, charList[pci].name) === 1) {
+  if(Helpers.checkBattles(msg.author.id, charList[pci].name) === 1) {
     msg.channel.send("You cannot be in more than one battle at a time.");
     return;
   }
@@ -2628,19 +2816,19 @@ if(command === "trial") {
     printBattleList(activeCombatList[activeCombatList.length-1]);
   }
   else if(args[0] === "kai") {
-    let npcI = findNPCID("Gohan");
+    let npcI = Helpers.findNPCID("Gohan", npcList);
     let newbattle = Raid.kaioshinTrial(techList, charList[pci],activeCombatList.length, npcList[npcI]);
     activeCombatList.push(newbattle);
     printBattleList(activeCombatList[activeCombatList.length-1]);
   }
   else if(args[0] === "krillin") {
-    let npcI = findNPCID("Krillin");
+    let npcI = Helpers.findNPCID("Krillin", npcList);
     let newbattle = Raid.krillinTrial(techList, charList[pci],activeCombatList.length, npcList[npcI]);
     activeCombatList.push(newbattle);
     printBattleList(activeCombatList[activeCombatList.length-1]);
   }
   else {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
     currEmbed.setDescription('That is not a valid name for a trial.');
     msg.channel.send({ embeds: [currEmbed] });
     return;
@@ -2648,15 +2836,15 @@ if(command === "trial") {
 }
 
 if(command === "forfeit") {
-  let pci = findID(msg.author.id);
-  let battleID = getCurrentBattle(msg.author.id, charList[pci].name);
+  let pci = Helpers.findID(msg.author.id, charList, users);
+  let battleID = Helpers.getCurrentBattle(msg.author.id, charList[pci].name);
   if(battleID !== -1) {
     printBattleList(activeCombatList[battleID],1);
 
     for(let i = 0; i < activeCombatList[battleID].pCombatants.length; i++) {
       let chance = Math.round(Math.random() * 99 + 1);
       if(msg.author.id === activeCombatList[battleID].pCombatants[i].playerID && activeCombatList[battleID].deathChance != 0 && chance < activeCombatList[battleID].deathChance*2) {
-        let user = getCharList(activeCombatList[battleID].pCombatants[i].playerID);
+        let user = Helpers.getCharList(activeCombatList[battleID].pCombatants[i].playerID, users);
         let zeni = (activeCombatList[battleID].pCombatants[i].level+activeCombatList[battleID].pCombatants[i].attributes.stotal)*20 + activeCombatList[battleID].zeniRisk;
         user.zeni = user.zeni - zeni;
         battleMessage(activeCombatList[battleID].pCombatants[i].name + " has died. They will be ressurected, but must pay " + zeni + " zeni. No Technique Points will be retained.");
@@ -2669,7 +2857,7 @@ if(command === "forfeit") {
       let chance = Math.round(Math.random() * 100);
       if(activeCombatList[battleID].NPCombatants[i].playerID !== 'NPC' && activeCombatList[battleID].NPCombatants[i].playerID !== 'Random') {
         if(msg.author.id === activeCombatList[battleID].NPCombatants[i].playerID && activeCombatList[battleID].deathChance != 0 && chance < activeCombatList[battleID].deathChance*2) {
-          let user = getCharList(activeCombatList[battleID].NPCombatants[i].playerID);
+          let user = Helpers.getCharList(activeCombatList[battleID].NPCombatants[i].playerID, users);
           let zeni = (activeCombatList[battleID].NPCombatants[i].level+activeCombatList[battleID].NPCombatants[i].attributes.stotal)*20 + activeCombatList[battleID].zeniRisk;
           user.zeni = user.zeni - zeni;
           battleMessage(activeCombatList[battleID].NPCombatants[i].name + " has died. They will be ressurected, but must pay " + zeni + " zeni. No Technique Points will be retained.");
@@ -2702,7 +2890,7 @@ if(command === "forfeit") {
 
   if(command === "zenkai") {
     if(msg.author.id === devID && args.length === 1) {
-        let index = findID(args[0]);
+        let index = Helpers.findID(args[0], charList, users);
 
         if(index != -1) {
           charList[index].zenkaiTriggered = 1;
@@ -2714,7 +2902,7 @@ if(command === "forfeit") {
             charList[index].hasZenkai = 0;
           }
 
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Result');
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Result');
           currEmbed.setDescription(str);
           msg.channel.send({ embeds: [currEmbed] });
           return;
@@ -2732,7 +2920,7 @@ if(command === "forfeit") {
       }
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('itemlookup[itemid] || itemlookup[itemid][addaffixtype]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
@@ -2741,13 +2929,13 @@ if(command === "forfeit") {
 
   if(command === 'makeitem' || command === 'createitem') {
     if(msg.author.id === devID) {
-      let uid = getCharListIndex(msg.author.id);
-      let index = findID(msg.author.id);
+      let uid = Helpers.getCharListIndex(msg.author.id, users);
+      let index = Helpers.findID(msg.author.id, charList, users);
 
       if(index === -1 || uid === null) {
       }
       else if(args.length === 2) {
-        let item = makeItem(args[0], args[1]);
+        let item = Helpers.makeItem(args[0], args[1], itemList);
         if(item) {
           itemList.push(item);
           printItem(item);
@@ -2755,7 +2943,7 @@ if(command === "forfeit") {
         }
       }
       else {
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('makeitem[type][quality]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -2766,7 +2954,7 @@ if(command === "forfeit") {
   if(command === "npcrebirth") {
     if(msg.author.id === devID) {
       if(args.length === 1 && isNaN(args[0])) {
-        let index = findNPCID(args[0]);
+        let index = Helpers.findNPCID(args[0], npcList);
 
         if(index != -1) {
           let xp = Math.round(npcList[index].totalexp*0.4);
@@ -2777,7 +2965,7 @@ if(command === "forfeit") {
         }
       }
       else {        
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('npcrebirth[target]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -2788,7 +2976,7 @@ if(command === "forfeit") {
   if(command === "rebirth") {
     if(msg.author.id === devID) {
       if(args.length === 1 && !isNaN(args[0])) {
-        let index = findID(args[0]);
+        let index = Helpers.findID(args[0], charList, users);
 
         if(index != -1) {
           charList[index].rebirth();
@@ -2797,7 +2985,7 @@ if(command === "forfeit") {
         }
       }
       else {        
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('rebirth[target]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -2808,27 +2996,27 @@ if(command === "forfeit") {
   if(command === "addxp" || command === "addexp") {
     if(msg.author.id === devID) {
       if(args.length === 1 && !isNaN(args[0])) {
-        let index = findID(msg.author.id);
+        let index = Helpers.findID(msg.author.id, charList, users);
     
         if(index != -1) {
           msg.channel.send(args[0] + 'XP added.');
           let str = charList[index].addEXP(Number(args[0]));
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(str);
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(str);
           if(str != null) msg.channel.send({ embeds: [currEmbed] });
         }
       }
       else if (args.length === 2 && !isNaN(args[0])) {
-        let index = findID(args[1]);
+        let index = Helpers.findID(args[1], charList, users);
     
         if(index != -1) {
           msg.channel.send(args[0] + 'XP added.');
           let str = charList[index].addEXP(Number(args[0]));
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(str);
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(str);
           if(str != null) msg.channel.send({ embeds: [currEmbed] });
         }
       }
       else {        
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('addxp[amount][target]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -2841,17 +3029,17 @@ if(command === "forfeit") {
   if(command === "npcaddxp" || command === "npcaddexp") {
     if(msg.author.id === devID) {
       if (args.length === 2) {
-        let index = findNPCID(args[1]);
+        let index = Helpers.findNPCID(args[1], npcList);
     
         if(index != -1) {
           msg.channel.send(args[0] + 'XP added.');
           let str = npcList[index].addEXP(Number(args[0]));
-          let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(str);
+          let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(str);
           if(str != null) msg.channel.send({ embeds: [currEmbed] });
         }
       }
       else {        
-        let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
         currEmbed.setDescription('npcaddxp[amount][target]');
         msg.channel.send({ embeds: [currEmbed] });
         return;
@@ -2865,13 +3053,13 @@ if(command === "forfeit") {
     if(msg.author.id !== devID) return;
 
     if(args.length < 3) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('npcstatup [dex,con,eng,foc,sol] [value] [npcname]');
       msg.channel.send({ embeds: [currEmbed] });
       return;
     }
 
-    let index = findNPCID(args[2]);
+    let index = Helpers.findNPCID(args[2], npcList);
 
     if(index === -1 || index === null) {
     }
@@ -2915,44 +3103,25 @@ if(command === "forfeit") {
       msg.channel.send("Done.");
     }
     else {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Invalid Format');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Invalid Format');
       currEmbed.setDescription('npcstatup [dex,con,eng,foc,sol] [value] [npcname]');
       msg.channel.send({ embeds: [currEmbed] });
     }
 
     loader.npcSaver(npcList);
   }
+})
+
+// end of commands
 
 
 /**********************/
 /*** Utility  Stuff ***/
 /**********************/
 
-  function calcXPTrainingCost(user, time) { 
-    //tp cost
-    let cost = Math.round(time*15*(1-(time-1)/100));
-    if(user.dojo !== null) {
-      cost *= 0.9;
-    }
-    return Math.floor(cost);
-  }
-
-  function calcTPTrainingCost(user, time) { 
-    //tp cost
-    let cost = Math.round(time*20000*(1-(time-1)/100));
-    if(user.dojo !== null) {
-      cost *= 0.9;
-    }
-    return Math.floor(cost);
-  }
-
-  function isImage(link) {
-    return /\.(jpg|jpeg|png|webp|avif|gif|svg)$/.test(link);
-  }
-
   function printAStat(char) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(char.name.replace(/\_/g,' '));
-      let currEmbed1 = new Discord.MessageEmbed(statusEmbed);
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(char.name.replace(/\_/g,' '));
+      let currEmbed1 = new Discord.EmbedBuilder(statusEmbed);
       if(char.image === '' || char.image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
       else { currEmbed.setThumbnail(char.image); }
       currEmbed.addFields(
@@ -3028,7 +3197,7 @@ if(command === "forfeit") {
   }
 
   function printStat(char) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(char.name.replace(/\_/g,' '));
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(char.name.replace(/\_/g,' '));
     if(char.image === '' || char.image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
     else { currEmbed.setThumbnail(char.image); }
     currEmbed.addFields(
@@ -3102,7 +3271,7 @@ if(command === "forfeit") {
     for(let i = 0; i < char.battleCurrAtt.buffs.length; i++) {
       if(char.battleCurrAtt.buffs[i].type === "Fighting Style") {
         found = 1;
-        currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(char.name.replace(/\_/g,' ') + "'s Fighting Style");
+        currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(char.name.replace(/\_/g,' ') + "'s Fighting Style");
         let cap = styleBonusCap + 50 * (parseInt(char.potentialUnlocked) + parseInt(char.potentialUnleashed));
         currEmbed.setDescription('The current total bonus is: **' + char.battleCurrAtt.buffs[i].getTotalChange().toLocaleString(undefined) + "%** out of the total cap of **" + cap.toLocaleString() + "%.**\nEach individual stat cap is **50%.**");
         currEmbed.addFields(
@@ -3114,11 +3283,142 @@ if(command === "forfeit") {
       }
     }
     if(found !== 1) {
-      currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('No Fighting Style');
+      currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('No Fighting Style');
       currEmbed.setDescription('A fighting style can be created with 150 technique points. Use the command **style create** with three of [str,dex,con,eng,sol,foc] that are not the same.');
     }
     return currEmbed;
   }
+
+  function displayTechImprovement(char, user) {
+    let allOptions = [];
+
+    allOptions = allOptions.concat(TechImp.unloadAllTechs(char, user));
+
+    if (allOptions.length === 0) {
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('No Technique Improvements Available');
+        currEmbed.setDescription('You need to have a base technique to improve it or meet specific requirements.');
+        msg.channel.send({ embeds: [currEmbed] });
+        return;
+    }
+
+    // Paginate options (4 per page to match displayModifyStyle)
+    let pages = [];
+    for (let i = 0; i < allOptions.length; i += 4) {
+        let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Technique Improvement');
+        currEmbed.setDescription(`Improve your techniques! You have ${char.techniquePoints.toLocaleString()} technique points.`);
+
+        const row = new ActionRowBuilder()
+
+        for (let j = 0; j < 4 && (i + j) < allOptions.length; j++) {
+
+          const option = allOptions[i + j];
+          currEmbed.addFields({ name: option[2], value: `${option[1]} TP`, inline: true });
+          if(j%2 === 1) {
+            currEmbed.addFields({ name: '\u200b', value: '\u200b', inline: true });
+          }
+
+          let disable = false;
+          if (option[1] > char.techniquePoints) {
+            disable = true;
+          }
+
+            row.addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`tech_${j}`)
+                    .setLabel(option[2])
+                    .setStyle(ButtonStyle.Primary)
+                    .setDisabled(disable)
+            );
+        }
+
+        // Fill remaining slots with disabled buttons
+        for (let j = allOptions.slice(i, i + 4).length; j < 4; j++) {
+          row.addComponents(
+              new ButtonBuilder()
+                  .setCustomId(`empty_${j}`)
+                  .setLabel('\u200b')
+                  .setStyle(ButtonStyle.Primary)
+                  .setDisabled(true)
+          );
+        }
+
+        pages.push([currEmbed, row]);
+    }
+
+    let page = 0;
+    const maxPage = pages.length;
+
+    // Navigation row
+    const navRow = new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('cancel')
+                .setLabel('❌')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId('left')
+                .setLabel('⬅')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(true),
+            new ButtonBuilder()
+                .setCustomId('right')
+                .setLabel('➡')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(maxPage <= 1)
+        );
+
+    char.techModify = 1; // Lock character during modification
+    msg.channel.send({ embeds: [pages[0][0]], components: [pages[0][1], navRow] }).then(message => {
+        const filter = i => i.user.id === char.playerID && message.id === i.message.id;
+        const collector = msg.channel.createMessageComponentCollector({ filter, time: 1000 * 60 * 60 * 12 });
+
+        collector.on('collect', async i => {
+            if (i.customId === 'cancel') {
+                char.techModify = 0;
+                i.update({ embeds: [pages[page][0]], components: [] });
+                collector.stop();
+            } else if (i.customId === 'left') {
+                if (page > 0) {
+                    page--;
+                    navRow.components[1].setDisabled(page === 0);
+                    navRow.components[2].setDisabled(false);
+                    i.update({ embeds: [pages[page][0]], components: [pages[page][1], navRow] });
+                }
+            } else if (i.customId === 'right') {
+                if (page < maxPage - 1) {
+                    page++;
+                    navRow.components[1].setDisabled(false);
+                    navRow.components[2].setDisabled(page === maxPage - 1);
+                    i.update({ embeds: [pages[page][0]], components: [pages[page][1], navRow] });
+                }
+            } else if (i.customId.startsWith('tech_')) {
+                const index = parseInt(i.customId.split('_')[1]);
+                const selectedOption = allOptions[page * 4 + index];
+                const [techID, techCost, techName] = selectedOption;
+
+                if (TechImp.applyImprovement(char, user, techID, techCost)) {
+                    loader.characterSaver(charList);
+                    let successEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Technique Improved');
+                    successEmbed.setDescription(`Successfully learned ${techName} for ${techCost} TP. Remaining TP: ${char.techniquePoints.toLocaleString()}`);
+                    i.update({ embeds: [successEmbed], components: [] });
+                    collector.stop();
+                    char.techModify = 0;
+                } else {
+                    let failEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Improvement Failed');
+                    failEmbed.setDescription('Not enough technique points or you already know this technique.');
+                    i.update({ embeds: [failEmbed], components: [] });
+                    collector.stop();
+                    char.techModify = 0;
+                }
+            }
+        });
+
+        collector.on('end', () => {
+            char.techModify = 0;
+        });
+    });
+}
+
 
   function displayModifyStyle(cost,char,count) {    
     let bonuses = char.fightingStyle.outputBonusArray();
@@ -3159,84 +3459,84 @@ if(command === "forfeit") {
     for(let varsIndex = 0; varsIndex < vars.length; varsIndex += parseInt(temp[0])) {
       temp = stylePick(varsIndex, vars, char.fightingStyle);
       three = temp[1];
-      let page1Embed = new Discord.MessageEmbed(statusEmbed).setTitle('Style Upgrades');
+      let page1Embed = new Discord.EmbedBuilder(statusEmbed).setTitle('Style Upgrades');
       page1Embed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/986181005591318558/unknown.png");
       page1Embed.setDescription("Choose one. Costs " + (bonuses.length*25).toLocaleString(undefined)  + " technique points. You have " + char.techniquePoints.toLocaleString(undefined) + ' technique points.');
 
-      const row = new MessageActionRow()
+      const row = new ActionRowBuilder()
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('cancel')
           .setLabel('❌')
-          .setStyle('DANGER')
+          .setStyle(ButtonStyle.Danger)
         );
 
       if(three[0] == '\u200b') {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel(three[0])
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel(three[0])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if(three[1] == '\u200b') {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel(three[1])
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel(three[1])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if(three[2] == '\u200b') {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel(three[2])
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel(three[2])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if(three[3] == '\u200b') {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('four')
             .setLabel(three[3])
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('four')
             .setLabel(three[3])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
 
@@ -3257,111 +3557,111 @@ if(command === "forfeit") {
       text:'The next upgrade will cost ' + cost.toLocaleString(undefined) + ' technique points. You currently have ' + char.techniquePoints.toLocaleString(undefined) + ' technique points.'
     });
     for(let i = 0; i < length; i+=4) {
-      const row = new MessageActionRow();
+      const row = new ActionRowBuilder();
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('cancel')
           .setLabel('❌')
-          .setStyle('DANGER')
+          .setStyle(ButtonStyle.Danger)
       );
       if(i == bonuses.length && bonuses.length < 6 && char.techniquePoints >= (bonuses.length*25)) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('new')
             .setLabel('Add New Stat')
-            .setStyle('SUCCESS'),
+            .setStyle(ButtonStyle.Success),
         );
       }
       else if(i >= bonuses.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel(bonuses[i][0])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if((i+1) == bonuses.length && bonuses.length < 6 && char.techniquePoints >= (bonuses.length*25)) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('new')
             .setLabel('Add New Stat')
-            .setStyle('SUCCESS'),
+            .setStyle(ButtonStyle.Success),
         );
       }
       else if((i+1) >= bonuses.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel(bonuses[i+1][0])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if((i+2) == bonuses.length && bonuses.length < 6 && char.techniquePoints >= (bonuses.length*25)) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('new')
             .setLabel('Add New Stat')
-            .setStyle('SUCCESS'),
+            .setStyle(ButtonStyle.Success),
         );
       }
       else if((i+2) >= bonuses.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel(bonuses[i+2][0])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if((i+3) == bonuses.length && bonuses.length < 6 && char.techniquePoints >= (bonuses.length*25)) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('new')
             .setLabel('Add New Stat')
-            .setStyle('SUCCESS'),
+            .setStyle(ButtonStyle.Success),
         );
       }
       else if((i+3) >= bonuses.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('four')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('four')
             .setLabel(bonuses[i+3][0])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       pages.push([currEmbed,row]);
@@ -3421,7 +3721,7 @@ if(command === "forfeit") {
         }
         else if(i.customId === 'addOne') {
           count = 1;
-          cost = calcStyleUpgrade(char.fightingStyle,count);
+          cost = Helpers.calcStyleUpgrade(char.fightingStyle,count);
           currEmbed = returnStyle(char);
           currEmbed.setFooter({
             text:'The next upgrade will cost ' + cost.toLocaleString(undefined) + ' technique points. You currently have ' + char.techniquePoints.toLocaleString(undefined) + ' technique points.'
@@ -3431,7 +3731,7 @@ if(command === "forfeit") {
         }
         else if(i.customId === 'addFive') {
           count = 5;
-          cost = calcStyleUpgrade(char.fightingStyle,count);
+          cost = Helpers.calcStyleUpgrade(char.fightingStyle,count);
           currEmbed = returnStyle(char);
           currEmbed.setFooter({
             text:'The next upgrade will cost ' + cost.toLocaleString(undefined) + ' technique points. You currently have ' + char.techniquePoints.toLocaleString(undefined) + ' technique points.'
@@ -3441,7 +3741,7 @@ if(command === "forfeit") {
         }
         else if(i.customId === 'addTen') {
           count = 10;
-          cost = calcStyleUpgrade(char.fightingStyle,count);
+          cost = Helpers.calcStyleUpgrade(char.fightingStyle,count);
           currEmbed = returnStyle(char);
           currEmbed.setFooter({
             text:'The next upgrade will cost ' + cost.toLocaleString(undefined) + ' technique points. You currently have ' + char.techniquePoints.toLocaleString(undefined) + ' technique points.'
@@ -3461,7 +3761,7 @@ if(command === "forfeit") {
           else valid = styleFunctions(char, bonuses[page*4][0], count, cost);
           if(valid[0] === 0) {
             char.techniquePoints -= cost;
-            cost = calcStyleUpgrade(char.fightingStyle,count);
+            cost = Helpers.calcStyleUpgrade(char.fightingStyle,count);
             loader.characterSaver(charList);
             loader.styleSaver(npcList,charList);
             currEmbed = returnStyle(char);
@@ -3496,7 +3796,7 @@ if(command === "forfeit") {
           else valid = styleFunctions(char, bonuses[page*4+1][0], count, cost);
           if(valid[0] === 0) {
             char.techniquePoints -= cost;
-            cost = calcStyleUpgrade(char.fightingStyle,count);
+            cost = Helpers.calcStyleUpgrade(char.fightingStyle,count);
             loader.characterSaver(charList);
             loader.styleSaver(npcList,charList);
             currEmbed = returnStyle(char);
@@ -3531,7 +3831,7 @@ if(command === "forfeit") {
           else valid = styleFunctions(char, bonuses[page*4+2][0], count, cost);
           if(valid[0] === 0) {
             char.techniquePoints -= cost;
-            cost = calcStyleUpgrade(char.fightingStyle,count);
+            cost = Helpers.calcStyleUpgrade(char.fightingStyle,count);
             loader.characterSaver(charList);
             loader.styleSaver(npcList,charList);
             currEmbed = returnStyle(char);
@@ -3566,7 +3866,7 @@ if(command === "forfeit") {
           else valid = styleFunctions(char, bonuses[page*4+3][0], count, cost);
           if(valid[0] === 0) {
             char.techniquePoints -= cost;
-            cost = calcStyleUpgrade(char.fightingStyle,count);
+            cost = Helpers.calcStyleUpgrade(char.fightingStyle,count);
             loader.characterSaver(charList);
             loader.styleSaver(npcList,charList);
             currEmbed = returnStyle(char);
@@ -3645,7 +3945,7 @@ if(command === "forfeit") {
     }
 
     if(invalid === 1) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Style Upgrade Failed');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Style Upgrade Failed');
       currEmbed.setDescription('Purchase failed, this would go above the stat cap or put you into negative TP. Try again.');
       msg.channel.send({ embeds: [currEmbed] });
       //printStyle(char);
@@ -3685,7 +3985,7 @@ if(command === "forfeit") {
 
       let currEmbed = returnStyle(char);
       currEmbed.setFooter({
-        text:'The next upgrade will cost ' + calcStyleUpgrade(char.fightingStyle,count).toLocaleString(undefined) + ' technique points. You currently have ' + tp.toLocaleString(undefined) + ' technique points.'
+        text:'The next upgrade will cost ' + Helpers.calcStyleUpgrade(char.fightingStyle,count).toLocaleString(undefined) + ' technique points. You currently have ' + tp.toLocaleString(undefined) + ' technique points.'
       });
       char.statusUpdate(0);
       return [invalid,currEmbed];
@@ -3696,94 +3996,94 @@ if(command === "forfeit") {
 
   function styleAddRow(count, char, page, maxPage, adding) {
     if(!adding) adding = 0;
-    let five = calcStyleUpgrade(char.fightingStyle,5);
-    let ten = calcStyleUpgrade(char.fightingStyle,10);
+    let five = Helpers.calcStyleUpgrade(char.fightingStyle,5);
+    let ten = Helpers.calcStyleUpgrade(char.fightingStyle,10);
 
-    let row2 = new MessageActionRow()
+    let row2 = new ActionRowBuilder()
     if(page === 0) {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('left')
           .setLabel('⬅')
-          .setStyle('PRIMARY')
+          .setStyle(ButtonStyle.Primary)
           .setDisabled(true),
           );
     }
     else {
     row2.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('left')
         .setLabel('⬅')
-        .setStyle('PRIMARY'),
+        .setStyle(ButtonStyle.Primary),
         );
     }
     if(page === (maxPage-1) && adding !== 1) {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('right')
           .setLabel('➡')
-          .setStyle('PRIMARY')
+          .setStyle(ButtonStyle.Primary)
           .setDisabled(true),
           );
     }
     else {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('right')
           .setLabel('➡')
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
           );
     }
 
     if(adding !== 1) {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('addOne')
           .setLabel('Set +1')
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
         );
     }
     else {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('addOne')
           .setLabel('Set +1')
-          .setStyle('PRIMARY')
+          .setStyle(ButtonStyle.Primary)
           .setDisabled(true),
         );
     }
 
     if(char.techniquePoints >= five && adding !== 1) {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
         .setCustomId('addFive')
         .setLabel('Set +5')
-        .setStyle('PRIMARY'),
+        .setStyle(ButtonStyle.Primary),
         );
     }
     else {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('addFive')
           .setLabel('Set +5')
-          .setStyle('PRIMARY')
+          .setStyle(ButtonStyle.Primary)
           .setDisabled(true),
         );
     }
     if(char.techniquePoints >= ten && adding !== 1) {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('addTen')
           .setLabel('Set +10')
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
         );
     }
     else {
       row2.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('addTen')
           .setLabel('Set +10')
-          .setStyle('PRIMARY')
+          .setStyle(ButtonStyle.Primary)
           .setDisabled(true),
         );
     }
@@ -3791,28 +4091,8 @@ if(command === "forfeit") {
     return row2;
   }
 
-  /*******************
-   * use formula to get the cost of the next (1%) increase
-   * 45,474 tp to 200%
-   * 22,165 tp to 150%
-   * 8,036 tp to 100%
-   * 1,385 tp to 50%
-  ********************/
-  function calcStyleUpgrade(style,amount) {
-    if(amount <= 1) {
-      return Math.round((Math.pow(style.getTotalChange(),1.5)) / 5);
-    }
-    else {
-      let total = 0;
-      for(let i = 0; i < amount; i++) {
-        total += Math.round((Math.pow(style.getTotalChange()+i,1.5)) / 5);
-      }
-      return total;
-    }
-  }
-
   function printInventory(uid) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(msg.author.username + "'s Inventory");
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(msg.author.username + "'s Inventory");
     currEmbed.setThumbnail(msg.author.avatarURL());
     for(let i = 0; i < users[uid].itemInventory.items.length; i++) {
       let temp = users[uid].itemInventory.items[i].printequipment();
@@ -3829,95 +4109,73 @@ if(command === "forfeit") {
     msg.channel.send({ embeds: [currEmbed] });
   }
 
-  function findStrongest() {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Overall Power - Top 10');
-    let characters = new Array();
-    let str;
+  async function viewProfile(interaction = null) {
+    let cArr;
+    if(interaction !== null) {
+      if(interaction !== null) {
+        cArr = Helpers.getCharList(interaction.user.id, users);
+        msg = {
+          author: interaction.user,
+          channel: interaction.channel,
+          reply: interaction.reply.bind(interaction),
+          send: (options) => interaction.channel.send(options),
+        }
+        interaction.reply("Very well.");
+      }
+    }
+    else {
+      cArr = Helpers.getCharList(msg.author.id, users);
+    }
 
-    for(let i = 0; i < charList.length; i++) {
-      characters.push(charList[i]);
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(msg.author.username);
+    currEmbed.setThumbnail(msg.author.avatarURL());
+    if(cArr !== null) {
+      for(let i = 0; i < cArr.charIDs.length; i++) {
+        let str = charList[cArr.charIDs[i]].name + ', ' + charList[cArr.charIDs[i]].race.raceName.replace(/\_/g,' ') + '\nPower Value: ' + (charList[cArr.charIDs[i]].level*charList[cArr.charIDs[i]].attributes.stotal).toLocaleString(undefined);
+        str += '\nStat Total: ' + charList[cArr.charIDs[i]].attributes.stotal.toLocaleString(undefined);
+        if(charList[cArr.charIDs[i]].training > 0) str += '\nTraining for ' + charList[cArr.charIDs[i]].training.toLocaleString(undefined) + ' more hours';
+        currEmbed.addFields([
+          {name:'Character ' + (1+i), value:str}
+        ]);
+      }
+      currEmbed.setFooter({ text: 'You have ' + cArr.zeni.toLocaleString(undefined) + ' zeni' });
+      msg.channel.send({ embeds: [currEmbed] });
     }
-    for(let i = 0; i < npcList.length; i++) {
-      characters.push(npcList[i]);
-    }
-    characters.sort(function(a,b) {return b.level*b.attributes.stotal - a.level*a.attributes.stotal});
-    for(let i = 0; i < characters.length && i < 10; i++) {
-      let id = characters[i].playerID;
-      if(characters[i].playerID === devID) id = "Developer"
-      let str = '**'+characters[i].name.replace(/\_/g,' ')+'**\nUserID: ' + id + '\nPower Value  ' + (characters[i].level*characters[i].attributes.stotal).toLocaleString(undefined);
-      currEmbed.addField('**Rank ' + (i+1) + '**', str);
-    }
-    msg.channel.send({ embeds: [currEmbed] });
   }
 
-  function makeItem(type, quality) {
-    let item;
-    let items = new Array();
+  async function findStrongest(interaction = null) {
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Overall Power - Top 10');
+    let characters = [...charList, ...npcList];
 
-    for(let i = 0; i < itemList.length; i++) { items.push(itemList[i]); }
-    items.sort(function(a,b) {return b.uid - a.uid});
-    let max = parseInt(items[0].uid);
+    characters.sort((a, b) =>
+      (b.level * b.attributes.stotal) - (a.level * a.attributes.stotal)
+    );
 
-    if(type === "weapon") {
-      if(quality === "standard") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateWeapon(),"Weapon")
-      }
-      else if(quality === "epic") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateEpicWeapon(),"Weapon")
-      }
-      else if(quality === "legendary") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateLegendaryWeapon(),"Weapon")
-      }
-      else if(quality === "mythic") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateMythicWeapon(),"Weapon")
-      }
-      else if(quality === "divine") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateDivineWeapon(),"Weapon")
-      }
+    for (let i = 0; i < Math.min(10, characters.length); i++) {
+      let id = characters[i].playerID;
+      if (id === devID) id = "Developer";
+      let str = '**' + characters[i].name.replace(/_/g, ' ') + '**\n' +
+              'UserID: ' + id + '\n' +
+              'Power Value: ' + (characters[i].level * characters[i].attributes.stotal).toLocaleString();
+
+      currEmbed.addFields({ name: `**Rank ${i + 1}**`, value: str, inline: false });
     }
-    else if(type === "dogi") {
-      if(quality === "standard") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateArmor(),"Dogi")
+
+    if (interaction) {
+      try {
+        await interaction.reply({ embeds: [currEmbed] });
+      } catch (err) {
+        console.error("Reply failed:", err);
       }
-      else if(quality === "epic") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateEpicDogi(),"Dogi")
-      }
-      else if(quality === "legendary") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateLegendaryDogi(),"Dogi")
-      }
-      else if(quality === "mythic") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateMythicDogi(),"Dogi")
-      }
-      else if(quality === "divine") {
-        let i = 1;
-        i = i + max;
-        item = new Equipment(i,nameGenerator.generateDivineDogi(),"Dogi")
-      }
+    } 
+    else {
+      msg.channel.send({ embeds: [currEmbed] });
     }
-    return item;
   }
 
   function printItem(item) {
     let itemStuff = item.printequipment();
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(itemStuff[0].replace(/\_/g,' '));
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(itemStuff[0].replace(/\_/g,' '));
     if(itemStuff[1] == "Dogi") currEmbed.setThumbnail(nameGenerator.dogiImageURL);
     else currEmbed.setThumbnail(nameGenerator.weaponImageURL);
 
@@ -3931,7 +4189,7 @@ if(command === "forfeit") {
     msg.channel.send({ embeds: [currEmbed] });
   }
 
-  function listNPCs() {
+  async function listNPCs(interaction = null) {
     let characters = new Array();
     let str;
 
@@ -3942,26 +4200,36 @@ if(command === "forfeit") {
     characters.sort(function(a,b) {return b.level*b.attributes.stotal - a.level*a.attributes.stotal});
     let j = 0;
     while(j < characters.length) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('NPC List');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('NPC List');
       for(let i = j; i < characters.length && i < 10; i+=2) {
         j+=2
         let str = '**'+characters[i].name.replace(/\_/g,' ') + '**\nPower Value  ' + (characters[i].level*characters[i].attributes.stotal).toLocaleString(undefined);
-        currEmbed.addField('\u200b', str, true);
-        currEmbed.addField('\u200b','\u200b', true);
+        currEmbed.addFields({ name:'\u200b', value:str, inline:true });
+        currEmbed.addFields({ name:'\u200b', value:'\u200b', inline:true });
         if((i+1) < characters.length) {
           let str = '**'+characters[i+1].name.replace(/\_/g,' ') + '**\nPower Value  ' + (characters[i+1].level*characters[i+1].attributes.stotal).toLocaleString(undefined);
-          currEmbed.addField('\u200b', str, true);
+          currEmbed.addFields({ name:'\u200b', value:str, inline:true });
         }
         else {
-          currEmbed.addField('\u200b','\u200b', true);
+          currEmbed.addFields({ name:'\u200b', value:'\u200b', inline:true });
         }
       }
-      msg.channel.send({ embeds: [currEmbed] });
+
+      if (interaction) {
+        try {
+          await interaction.reply({ embeds: [currEmbed] });
+        } catch (err) {
+          console.error("Reply failed:", err);
+        }
+      } 
+      else {
+        msg.channel.send({ embeds: [currEmbed] });
+      }
     }
   }
 
   function guildFunctions(targetPlayer) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(targetPlayer.dojo.guildName.replace(/\_/g,' ') + ' Dojo Information');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(targetPlayer.dojo.guildName.replace(/\_/g,' ') + ' Dojo Information');
     currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985368853758509066/unknown.png")
     let estr = 'Total Members: ' + targetPlayer.dojo.guildList.length + ' / ' + targetPlayer.dojo.maxSize;
     let valueStr = 'Guild Leader: <@' + targetPlayer.dojo.guildLeader.userID + '>';
@@ -3971,28 +4239,28 @@ if(command === "forfeit") {
     currEmbed.setDescription(valueStr);
     currEmbed.setFooter({ text: estr });
 
-    const confirmRow = new MessageActionRow();
+    const confirmRow = new ActionRowBuilder();
     confirmRow.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('yes')
         .setLabel('Accpet')
-        .setStyle('SUCCESS'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
         .setCustomId('no')
         .setLabel('Decline')
-        .setStyle('DANGER'),
+        .setStyle(ButtonStyle.Danger),
       );
 
-    const functionRow = new MessageActionRow();
+    const functionRow = new ActionRowBuilder();
     functionRow.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('adoptStyle')
         .setLabel('Adopt Style')
-        .setStyle('PRIMARY'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
         .setCustomId('leaveGuild')
         .setLabel('Leave Guild')
-        .setStyle('DANGER'),
+        .setStyle(ButtonStyle.Danger),
       );
 
     let totalPages = 0;
@@ -4000,8 +4268,8 @@ if(command === "forfeit") {
     let memPages = new Array();
     let memRows = new Array();
 
-    let memEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(targetPlayer.dojo.guildName.replace(/\_/g,' ') + ' Member List');
-    let memRow = new MessageActionRow();
+    let memEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(targetPlayer.dojo.guildName.replace(/\_/g,' ') + ' Member List');
+    let memRow = new ActionRowBuilder();
     for(let i = 0; i < 5; i++) { //targetPlayer.dojo.guildList.length
       let i = 0;
       let usr = bot.users.cache.get(targetPlayer.dojo.guildList[i].userID);
@@ -4009,10 +4277,10 @@ if(command === "forfeit") {
       let id = i + "";
 
       memRow.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId(id)
           .setLabel(str)
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
         );
 
       str = "<@" + targetPlayer.dojo.guildList[i].userID + ">";
@@ -4024,8 +4292,8 @@ if(command === "forfeit") {
         totalPages += 1;
         memPages.push(memEmbed);
         memRows.push(memRow);
-        memEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(targetPlayer.dojo.guildName.replace(/\_/g,' ') + ' Member List');
-        memRow = new MessageActionRow();
+        memEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(targetPlayer.dojo.guildName.replace(/\_/g,' ') + ' Member List');
+        memRow = new ActionRowBuilder();
       }
     }
 
@@ -4042,7 +4310,7 @@ if(command === "forfeit") {
 
         if(i.customId === 'yes') {
           if(currentFunction === 'adoptStyle') {
-            let cindex = findID(targetPlayer.userID);
+            let cindex = Helpers.findID(targetPlayer.userID, charList, users);
             charList[cindex].changeStyleName(targetPlayer.dojo.guildStyle);
           }
           else if(currentFunction === 'leaveGuild') {
@@ -4052,7 +4320,7 @@ if(command === "forfeit") {
               targetPlayer.dojoRank = null;
             }
             else {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
               currEmbed.setDescription("You are the dojo's master. Pass the leadership or disband instead.");
               msg.channel.send({ embeds: [currEmbed] });
             }
@@ -4063,7 +4331,7 @@ if(command === "forfeit") {
         }
         else if(i.customId === 'no') {
           currentFunction = 'home';
-          currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(targetPlayer.dojo.guildName.replace(/\_/g,' ') + ' Dojo Information');
+          currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(targetPlayer.dojo.guildName.replace(/\_/g,' ') + ' Dojo Information');
           currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985368853758509066/unknown.png")
           let estr = 'Total Members: ' + targetPlayer.dojo.guildList.length + ' / ' + targetPlayer.dojo.maxSize;
           let valueStr = 'Guild Leader: <@' + targetPlayer.dojo.guildLeader.userID + '>';
@@ -4076,18 +4344,18 @@ if(command === "forfeit") {
          }
         else if(i.customId === 'adoptStyle') {
           currentFunction = 'adoptStyle';
-          currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Please confirm you wish to adopt your dojo's fighting style.");
+          currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Please confirm you wish to adopt your dojo's fighting style.");
           currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985368853758509066/unknown.png")
-          currEmbed.addField('Are you sure?','\u200b', false);
+          currEmbed.addFields({ name:'Are you sure?', value:'\u200b', inline:false });
           currEmbed.setFooter({ text: 'Press a button to accept or not.'});
 
           i.update({ embeds: [currEmbed], components: [confirmRow] });
         }
         else if(i.customId === 'leaveGuild') {
           currentFunction = 'leaveGuild';
-          currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Please confirm you wish to leave your dojo.");
+          currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Please confirm you wish to leave your dojo.");
           currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985368853758509066/unknown.png")
-          currEmbed.addField('Are you sure?','\u200b', false);
+          currEmbed.addFields({ name:'Are you sure?', value:'\u200b', inline:false });
           currEmbed.setFooter({ text: 'Press a button to accept or not.'});
 
           i.update({ embeds: [currEmbed], components: [confirmRow] });
@@ -4103,21 +4371,21 @@ if(command === "forfeit") {
   }
 
   function passGuild(targetPlayer, newLeader) {
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Please confirm you wish to pass the leadership of your dojo.');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Please confirm you wish to pass the leadership of your dojo.');
     currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985368853758509066/unknown.png")
 
-    currEmbed.addField('Are you sure?','\u200b', false);
+    currEmbed.addFields({ name:'Are you sure?', value:'\u200b', inline:false });
 
-    const row = new MessageActionRow();
+    const row = new ActionRowBuilder();
     row.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('yes')
         .setLabel('Accpet')
-        .setStyle('SUCCESS'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
         .setCustomId('no')
         .setLabel('Decline')
-        .setStyle('DANGER'),
+        .setStyle(ButtonStyle.Danger),
       );
 
     currEmbed.setFooter({ text: 'Press a button to accept or not.'});
@@ -4136,7 +4404,7 @@ if(command === "forfeit") {
           if(result !== -1) {
           }
           else {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
             currEmbed.setDescription("Target is not elligible for passing dojo leadership.");
             msg.channel.send({ embeds: [currEmbed] });
           }
@@ -4159,17 +4427,17 @@ if(command === "forfeit") {
 
 
   function displayChallenge(player, targetPlayer, zeni, pchar, tchar) {
-    let check = getCharListIndex(msg.author.id);
+    let check = Helpers.getCharListIndex(msg.author.id, users);
     if (check == null) return;
     if(users[check].shopping !== 0 || users[check].affixing !== 0 || charList[pchar].training > 0) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('You are already busy.');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('You are already busy.');
       currEmbed.setDescription("Finish what you're doing before picking fights.");
       msg.channel.send({ embeds: [currEmbed] });
       return;
     }
 
     msg.channel.send('<@' + targetPlayer.userID + '>');
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(charList[player.getCurrentChar()].name + ' has sent you a challenge.');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(charList[player.getCurrentChar()].name + ' has sent you a challenge.');
     currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985368853758509066/unknown.png")
     if(zeni > 0) {
       currEmbed.addFields(
@@ -4177,16 +4445,16 @@ if(command === "forfeit") {
       );
     }
 
-    const row = new MessageActionRow();
+    const row = new ActionRowBuilder();
     row.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('yes')
         .setLabel('Accpet')
-        .setStyle('SUCCESS'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
         .setCustomId('no')
         .setLabel('Decline')
-        .setStyle('DANGER'),
+        .setStyle(ButtonStyle.Danger),
       );
 
     currEmbed.setFooter({ text: 'Press button to accept challenge or not. You have ' + targetPlayer.zeni.toLocaleString(undefined) + ' zeni.' });
@@ -4204,21 +4472,21 @@ if(command === "forfeit") {
       collector.on('collect', async i => {
 
         if(i.customId === 'yes' && targetPlayer.zeni > zeni && player.zeni > zeni) {
-          if(checkBattles(player.userID, charList[pchar].name) === 1 
-            || checkBattles(targetPlayer.userID, charList[tchar].name) === 1 ) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Error');
+          if(Helpers.checkBattles(player.userID, charList[pchar].name) === 1 
+            || Helpers.checkBattles(targetPlayer.userID, charList[tchar].name) === 1 ) {
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
             currEmbed.setDescription('No combatant can be in more than one battle at a time.');
             i.update({ embeds: [currEmbed], components: [] });
             collector.stop();
           }
           else if(player.tutorial === 1 || targetPlayer.tutorial === 1) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Slow Down!');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Slow Down!');
             currEmbed.setDescription("Follow the tutorial to the end before doing this.");
             msg.channel.send({ embeds: [currEmbed] });
             return;
           }
           else if(targetPlayer.shopping !== 0 || targetPlayer.affixing !== 0 || charList[tchar].training > 0) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('You are already busy.');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('You are already busy.');
             currEmbed.setDescription("Finish what you're doing before picking fights.");
             msg.channel.send({ embeds: [currEmbed] });
             return;
@@ -4262,24 +4530,24 @@ if(command === "forfeit") {
   }
 
   function displayPartyInvite(player, targetPlayer, inviteOrApply) {
-    let check = getCharListIndex(msg.author.id);
+    let check = Helpers.getCharListIndex(msg.author.id, users);
     msg.channel.send('<@' + targetPlayer.playerID + '>');
     if (check == null) return
     let currEmbed;
-    if(inviteOrApply === 1) currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(player.name + ' has sent you a party invite.');
-    else currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(player.name + ' has sent you a party join request.');
+    if(inviteOrApply === 1) currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(player.name + ' has sent you a party invite.');
+    else currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(player.name + ' has sent you a party join request.');
     currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/986893015673085962/unknown.png")
 
-    const row = new MessageActionRow();
+    const row = new ActionRowBuilder();
     row.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('yes')
         .setLabel('Accpet')
-        .setStyle('SUCCESS'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
         .setCustomId('no')
         .setLabel('Decline')
-        .setStyle('DANGER'),
+        .setStyle(ButtonStyle.Danger),
       );
 
     currEmbed.setFooter({ text: 'Press button to accept invite or not.' });
@@ -4297,39 +4565,39 @@ if(command === "forfeit") {
 
           if(inviteOrApply === 1) {
             for(let i = 0; i < player.party.partyList.length; i++) {
-              let temp = getCurrentBattle(player.party.partyList[i].playerID, player.party.partyList[i].name);
+              let temp = Helpers.getCurrentBattle(player.party.partyList[i].playerID, player.party.partyList[i].name);
               if(temp > bcheck) bcheck = temp;
             }
           }
           else {
             for(let i = 0; i < targetPlayer.party.partyList.length; i++) {
-              let temp = getCurrentBattle(targetPlayer.party.partyList[i].playerID, targetPlayer.party.partyList[i].name);
+              let temp = Helpers.getCurrentBattle(targetPlayer.party.partyList[i].playerID, targetPlayer.party.partyList[i].name);
               if(temp > bcheck) bcheck = temp;
             }
           }
 
           if(inviteOrApply === 1 && targetPlayer.party !== null) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
             currEmbed.setDescription("You're already in a party.");
             msg.channel.send({ embeds: [currEmbed] });
           }
           else if(inviteOrApply === 1 && player.party === null) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
             currEmbed.setDescription("You're no longer in a party.");
             msg.channel.send({ embeds: [currEmbed] });
           }
           else if(inviteOrApply === 0 && targetPlayer.party === null) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
             currEmbed.setDescription("You're already in a party.");
             msg.channel.send({ embeds: [currEmbed] });
           }
           else if(inviteOrApply === 0 && player.party !== null) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
             currEmbed.setDescription("Target no longer in a party.");
             msg.channel.send({ embeds: [currEmbed] });
           }
           else if(bcheck !== -1) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
             currEmbed.setDescription("One or more members are in battle. Try again later.");
             msg.channel.send({ embeds: [currEmbed] });
           }
@@ -4339,14 +4607,14 @@ if(command === "forfeit") {
             else success = targetPlayer.party.addCharacter(player);
 
             if(success === 0) {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Error");
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Error");
               currEmbed.setDescription("That party is already full.");
               msg.channel.send({ embeds: [currEmbed] });
             }
             else {
               loader.partySaver(partyList);
 
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Successfully joined: ' + player.party.partyName.replace(/\_/g,' '));
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Successfully joined: ' + player.party.partyName.replace(/\_/g,' '));
               for(let i = 0; i < player.party.partyList.length; i++) {
                 let valueStr = 'Power Value: ' + (player.party.partyList[i].level*player.party.partyList[i].attributes.stotal).toLocaleString(undefined);
                 valueStr += '\nStat Total: ' + player.party.partyList[i].attributes.stotal.toLocaleString(undefined);
@@ -4375,18 +4643,18 @@ if(command === "forfeit") {
 
   //list options, if any, and a close button
   function displayPartyKick(player) {
-    let check = getCharListIndex(msg.author.id);
+    let check = Helpers.getCharListIndex(msg.author.id, users);
     if (check == null) return
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle("Kick Player");
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle("Kick Player");
     currEmbed.setDescription(player.name + ', who would you like to remove from ' + player.party.partyName.replace(/\_/g,' ') + '?');
     let eyes = new Array();
     //currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/986893015673085962/unknown.png")
 
-    const row = new MessageActionRow();
-    row.addComponents(new MessageButton()
+    const row = new ActionRowBuilder();
+    row.addComponents(new ButtonBuilder()
         .setCustomId('cancel')
         .setLabel('❌')
-        .setStyle('DANGER'),
+        .setStyle(ButtonStyle.Danger),
       );
     let i = 0;
     if(player.party.partyList.length > 1) {
@@ -4398,18 +4666,18 @@ if(command === "forfeit") {
         let str = player.party.partyList[i].name;
         eyes.push(i);
         i++;
-        row.addComponents(new MessageButton()
+        row.addComponents(new ButtonBuilder()
           .setCustomId('one')
           .setLabel(str)
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
         );
       }
       else {
         let str = "None";
-        row.addComponents(new MessageButton()
+        row.addComponents(new ButtonBuilder()
           .setCustomId('one')
           .setLabel(str)
-          .setStyle('PRIMARY')
+          .setStyle(ButtonStyle.Primary)
           .setDisabled(true),
         );
       }
@@ -4423,18 +4691,18 @@ if(command === "forfeit") {
         let str = player.party.partyList[i].name;
         eyes.push(i);
         i++;
-        row.addComponents(new MessageButton()
+        row.addComponents(new ButtonBuilder()
           .setCustomId('two')
           .setLabel(str)
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
         );
       }
       else {
         let str = "None";
-        row.addComponents(new MessageButton()
+        row.addComponents(new ButtonBuilder()
           .setCustomId('two')
           .setLabel(str)
-          .setStyle('PRIMARY')
+          .setStyle(ButtonStyle.Primary)
           .setDisabled(true),
         );
       }
@@ -4481,23 +4749,23 @@ if(command === "forfeit") {
   function displayOffer(player, targetPlayer, zeni, item) {
     msg.channel.send('<@' + targetPlayer.userID + '>');
     printItem(item);
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(charList[player.getCurrentChar()].name.replace(/\_/g,' ') + ' has sent you an offer.');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(charList[player.getCurrentChar()].name.replace(/\_/g,' ') + ' has sent you an offer.');
     currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985070860631158804/unknown.png")
     currEmbed.addFields(
       { name: item.name.replace(/\_/g,' '), value: parseInt(zeni).toLocaleString(undefined) + ' zeni', inline:false },
       );
     currEmbed.setFooter({ text: 'Press button to buy item or not. You have ' + targetPlayer.zeni.toLocaleString(undefined) + ' zeni.' });
 
-    const row = new MessageActionRow();
+    const row = new ActionRowBuilder();
     row.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('yes')
         .setLabel('Yes')
-        .setStyle('SUCCESS'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
         .setCustomId('no')
         .setLabel('No')
-        .setStyle('DANGER'),
+        .setStyle(ButtonStyle.Danger),
       );
 
     player.trading = 1;
@@ -4513,7 +4781,7 @@ if(command === "forfeit") {
         if(i.customId === 'yes' && targetPlayer.zeni > zeni && targetPlayer.itemInventory.items.length < targetPlayer.itemInventory.maxSize) {
 
           if(player.tutorial === 1 || targetPlayer.tutorial === 1) {
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Slow Down!');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Slow Down!');
             currEmbed.setDescription("Follow the tutorial to the end before doing this.");
             msg.channel.send({ embeds: [currEmbed] });
             i.update({ embeds: [currEmbed], components: [] });
@@ -4557,75 +4825,75 @@ if(command === "forfeit") {
     let pages = new Array();
 
     for(let i = 0; i < array.length; i+=3) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Help');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Help');
       currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png")
       currEmbed.setDescription("What would you like to know?");
       currEmbed.setFooter({ text: 'Press button to view help information about the topic.' });
 
-      const row = new MessageActionRow();
+      const row = new ActionRowBuilder();
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('cancel')
           .setLabel('❌')
-          .setStyle('DANGER')
+          .setStyle(ButtonStyle.Danger)
       );
       if(i >= array.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel(array[i])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
 
       if((i+1) >= array.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel(array[i+1])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if((i+2) >= array.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel(array[i+2])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('right')
           .setLabel('➡')
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
       );
 
       pages.push([currEmbed,row])
@@ -4634,47 +4902,47 @@ if(command === "forfeit") {
   }
 
   function navigationBar(left, right) {
-      const row = new MessageActionRow();
+      const row = new ActionRowBuilder();
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('cancel')
           .setLabel('❌')
-          .setStyle('DANGER'),
+          .setStyle(ButtonStyle.Danger),
       );
 
 
       if(left) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('left')
             .setLabel('⬅')
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('left')
             .setLabel('⬅')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
 
       if(right) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('right')
             .setLabel('➡')
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('right')
             .setLabel('➡')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
@@ -4687,88 +4955,88 @@ if(command === "forfeit") {
       let str = ""
       if(player.dojo !== null) str = ', ' + player.dojo.guildName.replace(/\_/g,' ');
 
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Training' + str);
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Training' + str);
       currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png");
       currEmbed.setFooter({ text: 'Select Character' });
       currEmbed.setDescription("Who needs training?");
 
       let currentPage = 0;
       let charRows = new Array();
-      let charRow = new MessageActionRow();
+      let charRow = new ActionRowBuilder();
       let i;
       for(i = 0; i < player.charIDs.length; i++) {
         let str = charList[player.charIDs[i]].name + ', ' + charList[player.charIDs[i]].race.raceName.replace(/\_/g,' ') + '\nPower Value: ' + (charList[player.charIDs[i]].level*charList[player.charIDs[i]].attributes.stotal).toLocaleString(undefined);
         str += '\nStat Total: ' + charList[player.charIDs[i]].attributes.stotal;
-        currEmbed.addField('Character ' + (1+i), str, true);
+        currEmbed.addFields({ name:'Character ' + (1+i), value:str, inline:true });
 
         if(charList[player.charIDs[i]].training > 0) {
           charRow.addComponents(
-            new MessageButton()
+            new ButtonBuilder()
               .setCustomId(i.toLocaleString(undefined))
               .setLabel(charList[player.charIDs[i]].name)
-              .setStyle('PRIMARY')
+              .setStyle(ButtonStyle.Primary)
               .setDisabled(true),
           );
         }
         else {
           charRow.addComponents(
-            new MessageButton()
+            new ButtonBuilder()
               .setCustomId(i.toLocaleString(undefined))
               .setLabel(charList[player.charIDs[i]].name)
-              .setStyle('PRIMARY'),
+              .setStyle(ButtonStyle.Primary),
           );
         }
 
         if((i != 0 && ((i+1)%5 == 0)) || i+1 == player.charIDs.length) {
           charRows.push(charRow);
-          charRow = new MessageActionRow();
+          charRow = new ActionRowBuilder();
         }
       }
       while(i < 6) {
-        currEmbed.addField('\u200b', '\u200b', true);
+        currEmbed.addFields({ name:'\u200b', value:'\u200b', inline:true });
         i++;
       }
 
       let row = navigationBar((player.charIDs.length > 5), (player.charIDs.length > 5));
 
-      const choiceRow = new MessageActionRow();
+      const choiceRow = new ActionRowBuilder();
       choiceRow.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('tp')
           .setLabel('Training Points')
-          .setStyle('PRIMARY'),
-        new MessageButton()
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
           .setCustomId('xp')
           .setLabel('Experience Points')
-          .setStyle('PRIMARY'),
-        new MessageButton()
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
           .setCustomId('txp')
           .setLabel('Hybrid')
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
       );
 
-      let timeRow = new MessageActionRow();
+      let timeRow = new ActionRowBuilder();
       timeRow.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('minus1')
           .setLabel('-1 Hour')
-          .setStyle('PRIMARY'),
-        new MessageButton()
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
           .setCustomId('plus1')
           .setLabel('+1 Hour')
-          .setStyle('PRIMARY'),
-        new MessageButton()
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
           .setCustomId('set12')
           .setLabel('Set to 12 Hours')
-          .setStyle('PRIMARY'),
-        new MessageButton()
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
           .setCustomId('set24')
           .setLabel('Set to 1 Day')
-          .setStyle('PRIMARY'),
-        new MessageButton()
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
           .setCustomId('confirm')
           .setLabel('Confirm Training')
-          .setStyle('SUCCESS'),
+          .setStyle(ButtonStyle.Success),
       );
 
       let charIndex = -1;
@@ -4818,7 +5086,7 @@ if(command === "forfeit") {
             i.update({ embeds: [currEmbed], components: [charRows[currentPage], row] });
           }
           if(swap !== -1 || !isNaN(i.customId)) {
-            currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Training' + str);
+            currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Training' + str);
             if(swap === -1) {
               charIndex = parseInt(i.customId);
             }
@@ -4841,12 +5109,12 @@ if(command === "forfeit") {
             let cost;
             let canPay = false;
             if(time === 'xp') {
-              cost = calcXPTrainingCost(player, hours);
+              cost = Helpers.calcXPTrainingCost(player, hours);
               canPay = (charList[player.charIDs[charIndex]].techniquePoints >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + charList[player.charIDs[charIndex]].techniquePoints.toLocaleString(undefined) + ' technique points.'});
             }
             else {
-              cost = calcTPTrainingCost(player, hours);
+              cost = Helpers.calcTPTrainingCost(player, hours);
               canPay = (player.zeni >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
             }
@@ -4862,12 +5130,12 @@ if(command === "forfeit") {
             let cost;
             let canPay = false;
             if(time === 'xp') {
-              cost = calcXPTrainingCost(player, hours);
+              cost = Helpers.calcXPTrainingCost(player, hours);
               canPay = (charList[player.charIDs[charIndex]].techniquePoints >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + charList[player.charIDs[charIndex]].techniquePoints.toLocaleString(undefined) + ' technique points.'});
             }
             else {
-              cost = calcTPTrainingCost(player, hours);
+              cost = Helpers.calcTPTrainingCost(player, hours);
               canPay = (player.zeni >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
             }
@@ -4883,12 +5151,12 @@ if(command === "forfeit") {
             let cost;
             let canPay = false;
             if(time === 'xp') {
-              cost = calcXPTrainingCost(player, hours);
+              cost = Helpers.calcXPTrainingCost(player, hours);
               canPay = (charList[player.charIDs[charIndex]].techniquePoints >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + charList[player.charIDs[charIndex]].techniquePoints.toLocaleString(undefined) + ' technique points.'});
             }
             else {
-              cost = calcTPTrainingCost(player, hours);
+              cost = Helpers.calcTPTrainingCost(player, hours);
               canPay = (player.zeni >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
             }
@@ -4904,12 +5172,12 @@ if(command === "forfeit") {
             let cost;
             let canPay = false;
             if(time === 'xp') {
-              cost = calcXPTrainingCost(player, hours);
+              cost = Helpers.calcXPTrainingCost(player, hours);
               canPay = (charList[player.charIDs[charIndex]].techniquePoints >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + charList[player.charIDs[charIndex]].techniquePoints.toLocaleString(undefined) + ' technique points.'});
             }
             else {
-              cost = calcTPTrainingCost(player, hours);
+              cost = Helpers.calcTPTrainingCost(player, hours);
               canPay = (player.zeni >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
             }
@@ -4925,12 +5193,12 @@ if(command === "forfeit") {
             let cost;
             let canPay = false;
             if(time === 'xp') {
-              cost = calcXPTrainingCost(player, hours);
+              cost = Helpers.calcXPTrainingCost(player, hours);
               canPay = (charList[player.charIDs[charIndex]].techniquePoints >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + charList[player.charIDs[charIndex]].techniquePoints.toLocaleString(undefined) + ' technique points.'});
             }
             else {
-              cost = calcTPTrainingCost(player, hours);
+              cost = Helpers.calcTPTrainingCost(player, hours);
               canPay = (player.zeni >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
             }
@@ -4945,12 +5213,12 @@ if(command === "forfeit") {
             let cost;
             let canPay = false;
             if(time === 'xp') {
-              cost = calcXPTrainingCost(player, hours);
+              cost = Helpers.calcXPTrainingCost(player, hours);
               canPay = (charList[player.charIDs[charIndex]].techniquePoints >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + charList[player.charIDs[charIndex]].techniquePoints.toLocaleString(undefined) + ' technique points.'});
             }
             else {
-              cost = calcTPTrainingCost(player, hours);
+              cost = Helpers.calcTPTrainingCost(player, hours);
               canPay = (player.zeni >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
             }
@@ -4965,12 +5233,12 @@ if(command === "forfeit") {
             let cost;
             let canPay = false;
             if(time === 'xp') {
-              cost = calcXPTrainingCost(player, hours);
+              cost = Helpers.calcXPTrainingCost(player, hours);
               canPay = (charList[player.charIDs[charIndex]].techniquePoints >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + charList[player.charIDs[charIndex]].techniquePoints.toLocaleString(undefined) + ' technique points.'});
             }
             else {
-              cost = calcTPTrainingCost(player, hours);
+              cost = Helpers.calcTPTrainingCost(player, hours);
               canPay = (player.zeni >= cost);
               currEmbed.setFooter({ text: 'Set training duration. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
             }
@@ -4982,16 +5250,16 @@ if(command === "forfeit") {
             charList[player.charIDs[charIndex]].training = hours;
             charList[player.charIDs[charIndex]].trainingType = time;
             if(time == 'xp') {
-              let cost = calcXPTrainingCost(player, hours);
+              let cost = Helpers.calcXPTrainingCost(player, hours);
               charList[player.charIDs[charIndex]].techniquePoints -= cost;
             }
             else if(time == 'txp') {
-              let cost = calcTPTrainingCost(player, hours);
+              let cost = Helpers.calcTPTrainingCost(player, hours);
               player.zeni -= cost;
               loader.userSaver(users);
             }
             else {
-              let cost = calcTPTrainingCost(player, hours);
+              let cost = Helpers.calcTPTrainingCost(player, hours);
               player.zeni -= cost;
               loader.userSaver(users);
             }
@@ -5011,14 +5279,14 @@ if(command === "forfeit") {
 
   function setTimeEmbed(hours, player, str, time, charIndex) {
     let cost;
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Training' + str);
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Training' + str);
 
     if(time === 'xp') {
-      cost = calcXPTrainingCost(player, hours);
+      cost = Helpers.calcXPTrainingCost(player, hours);
       currEmbed.setFooter({ text: 'Set training duration. You have ' + charList[player.charIDs[charIndex]].techniquePoints.toLocaleString(undefined) + ' technique points.'});
     }
     else {
-      cost = calcTPTrainingCost(player, hours);
+      cost = Helpers.calcTPTrainingCost(player, hours);
       currEmbed.setFooter({ text: 'Set training duration. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
     }
 
@@ -5028,19 +5296,19 @@ if(command === "forfeit") {
     if(time === 'xp') {
       if(hours > 1) coststr = hours + " hours of combat training will cost " + cost.toLocaleString(undefined) + " technique points. Character will be unavailable for most actions while training."
       else coststr = hours + " hour of Technique training will cost " + cost.toLocaleString(undefined) + " technique points. Character will be unavailable for most actions while training."
-      let xp = calcXPTrainingGain(charList[player.charIDs[charIndex]], player);
+      let xp = Helpers.calcXPTrainingGain(charList[player.charIDs[charIndex]], player);
       coststr += '\nThis will yield approximately ' + xp.toLocaleString(undefined) + ' exp per hour.';
     }
     else if(time === 'txp') {
       if(hours > 1) coststr = hours + " hours of technique training will cost " + cost.toLocaleString(undefined) + " zeni. Character will be unavailable for most actions while training."
       else coststr = hours + " hour of Technique training will cost " + cost.toLocaleString(undefined) + " zeni. Character will be unavailable for most actions while training."
-      let xp = calcTXPTrainingGain(charList[player.charIDs[charIndex]], player);
+      let xp = Helpers.calcTXPTrainingGain(charList[player.charIDs[charIndex]], player);
       coststr += '\nThis will yield approximately ' + xp.toLocaleString(undefined) + ' exp per hour.';
     }
     else {
       if(hours > 1) coststr = hours + " hours of hybrid training will cost " + cost.toLocaleString(undefined) + " zeni. Character will be unavailable for most actions while training."
       else coststr = hours + " hour of Technique training will cost " + cost.toLocaleString(undefined) + " zeni. Character will be unavailable for most actions while training."
-      let xp = calcTPTrainingGain(charList[player.charIDs[charIndex]], player);
+      let xp = Helpers.calcTPTrainingGain(charList[player.charIDs[charIndex]], player);
       coststr += '\nThis will yield approximately ' + xp.toLocaleString(undefined) + ' technique points per hour.';
     }
     coststr += '\nEXP gained is drastically reduced for characters over level ' + trainingSoftCap + '.' 
@@ -5049,40 +5317,40 @@ if(command === "forfeit") {
   }
 
   function setTimeRow(canPay) {
-    let timeRow = new MessageActionRow();
+    let timeRow = new ActionRowBuilder();
     timeRow.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('minus1')
         .setLabel('-1 Hour')
-        .setStyle('PRIMARY'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
         .setCustomId('plus1')
         .setLabel('+1 Hour')
-        .setStyle('PRIMARY'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
         .setCustomId('set1')
         .setLabel('Set to 1 Hour')
-        .setStyle('PRIMARY'),
-      new MessageButton()
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
         .setCustomId('set24')
         .setLabel('Set to 1 Day')
-        .setStyle('PRIMARY'),
+        .setStyle(ButtonStyle.Primary),
     );
 
     if(canPay == true) {
       timeRow.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('confirm')
         .setLabel('Confirm Training')
-        .setStyle('SUCCESS'),
+        .setStyle(ButtonStyle.Success),
       );
     }
     else {
       timeRow.addComponents(
-      new MessageButton()
+      new ButtonBuilder()
         .setCustomId('confirm')
         .setLabel('Cannot Afford This')
-        .setStyle('SUCCESS')
+        .setStyle(ButtonStyle.Success)
         .setDisabled(true),
       );
     }
@@ -5091,12 +5359,23 @@ if(command === "forfeit") {
   }
 
 
-  function displayHelp(playerID) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Help');
+  function displayHelp(playerID, interaction = null) {
+      if(interaction !== null) {
+        playerID = interaction.user.id;
+        msg = {
+          author: interaction.user,
+          channel: interaction.channel,
+          reply: interaction.reply.bind(interaction),
+          send: (options) => interaction.channel.send(options),
+        }
+        interaction.reply("Very well.");
+      }
+
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Help');
       currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png");
       currEmbed.setFooter({ text: 'Press button to view sub categories for the topic.' });
 
-      let index = getCharListIndex(playerID);//here
+      let index = Helpers.getCharListIndex(playerID, users);
       if(index !== null && users[index].tutorial === 1 && users[index].tutorialNearEnd === 1) {
         let str = Help.tutorial(5);
         users[index].zeni += parseInt(Help.tutorialReward);
@@ -5106,23 +5385,23 @@ if(command === "forfeit") {
       }
       else currEmbed.setDescription("Please choose a topic.");
 
-      const row = new MessageActionRow();
-      row.addComponents(
-        new MessageButton()
-          .setCustomId('cancel')
-          .setLabel('❌')
-          .setStyle('DANGER'),
+       const row = new ActionRowBuilder();
+       row.addComponents(
+        new ButtonBuilder()
+            .setCustomId('cancel')
+            .setLabel('❌')
+            .setStyle(ButtonStyle.Danger),
 
-        new MessageButton()
-          .setCustomId('commands')
-          .setLabel('Bot Commands Help')
-          .setStyle('PRIMARY'),
+        new ButtonBuilder()
+            .setCustomId('commands')
+            .setLabel('Bot Commands Help')
+            .setStyle(ButtonStyle.Primary),
 
-        new MessageButton()
-          .setCustomId('rpg')
-          .setLabel('RPG Help')
-          .setStyle('PRIMARY')
-      );
+        new ButtonBuilder()
+            .setCustomId('rpg')
+            .setLabel('RPG Help')
+            .setStyle(ButtonStyle.Primary)
+    );
 
       let pages = new Array();
       let holder = new Array();
@@ -5130,16 +5409,21 @@ if(command === "forfeit") {
       let maxPage = 0;
       let choice = "none";
       let firstChoice = "none";
+      let collector; 
 
+      if(interaction === null) {
+
+      }
       msg.channel.send({ embeds: [currEmbed], components: [row]}).then(message => {
         const filter = (i) => {
                  return (i.user.id === playerID && message.id === i.message.id);
               };
 
-        const collector = msg.channel.createMessageComponentCollector({ filter, time: 1000*60*60*12 });
+        collector = msg.channel.createMessageComponentCollector({ filter, time: 1000*60*60*12 });
 
         let item;
         collector.on('collect', async i => {
+
           if(i.customId === 'cancel') { 
             if(choice === "none" && firstChoice === "none") {
               currEmbed.setDescription("Let me know if you need anything else.");
@@ -5298,7 +5582,6 @@ if(command === "forfeit") {
         collector.on('end', collected => {
         })
       });
-
   }
 
   function displayShop(player) {
@@ -5326,7 +5609,7 @@ if(command === "forfeit") {
     let maxPage = Math.floor((merchInfo.length)/3) - 1;
 
     for(let i = 0; i < merch.length; i+=3) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Shop');
+      let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Shop');
       currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985070860631158804/unknown.png")
       currEmbed.addFields(
         { name: merch[i], value: merchPrice[i].toLocaleString(undefined) + ' zeni', inline:false },
@@ -5335,70 +5618,70 @@ if(command === "forfeit") {
       );
       currEmbed.setFooter({ text: 'Press button to buy item. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.' });
 
-      const row = new MessageActionRow();
+      const row = new ActionRowBuilder();
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('cancel')
           .setLabel('❌')
-          .setStyle('DANGER')
+          .setStyle(ButtonStyle.Danger)
       );
       if(i >= merch.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel(merch[i])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
 
       if((i+1) >= merch.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel(merch[i+1])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if((i+2) >= merch.length) {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel('\u200b')
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
       else {
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel(merch[i+2])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('right')
           .setLabel('➡')
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
       );
 
       pages.push([currEmbed,row])
@@ -5459,7 +5742,7 @@ if(command === "forfeit") {
           player.shopping = 0;
           if(player.itemInventory.items.length > 0 && player.tutorial === 1) {
             let str = Help.tutorial(3);
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Tutorial');
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Tutorial');
             currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png");
             currEmbed.setDescription(str);
             msg.channel.send({ embeds: [currEmbed] });
@@ -5471,7 +5754,7 @@ if(command === "forfeit") {
   function shopFunctions(merchInfo, player, cost) {
     if(merchInfo[0] === "item") {
       invIndex = invList.map(function(e) { return e.userID; }).indexOf(player.userID);
-      let item = makeItem(merchInfo[1],merchInfo[2]);
+      let item = Helpers.makeItem(merchInfo[1],merchInfo[2], itemList);
       if(item !== -1 && player.itemInventory.items.length !== player.itemInventory.maxSize) {
         msg.channel.send("<@" + player.userID + "> Successfully purchased item box.")
         printItem(item);
@@ -5556,15 +5839,15 @@ if(command === "forfeit") {
     for(let varsIndex = 0; varsIndex < vars.length; varsIndex += parseInt(temp[0])) {
       temp = pick(varsIndex, vars, item);
       six = temp[1];
-      let page1Embed = new Discord.MessageEmbed(statusEmbed).setTitle('Item Affix Workshop');
+      let page1Embed = new Discord.EmbedBuilder(statusEmbed).setTitle('Item Affix Workshop');
       page1Embed.setThumbnail("https://cdn.discordapp.com/attachments/832585611486691408/985655802947854396/unknown.png")
 
-      const row = new MessageActionRow()
+      const row = new ActionRowBuilder()
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('cancel')
           .setLabel('❌')
-          .setStyle('DANGER')
+          .setStyle(ButtonStyle.Danger)
         );
 
       if(six[0][0] == '\u200b') {
@@ -5575,10 +5858,10 @@ if(command === "forfeit") {
           { name: six[0][0], value: six[0][1].toLocaleString(undefined) + ' zeni', inline:true },
         );
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('one')
             .setLabel(six[0][0])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
 
@@ -5587,10 +5870,10 @@ if(command === "forfeit") {
           { name: six[1][0], value: six[1][1].toLocaleString(undefined), inline:true },
         );
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel(six[1][0])
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
@@ -5599,10 +5882,10 @@ if(command === "forfeit") {
           { name: six[1][0], value: six[1][1].toLocaleString(undefined) + ' zeni', inline:true },
         );
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('two')
             .setLabel(six[1][0])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       if(six[2][0] == '\u200b') {
@@ -5610,10 +5893,10 @@ if(command === "forfeit") {
           { name: six[2][0], value: six[2][1].toLocaleString(undefined), inline:true },
         );
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel(six[2][0])
-            .setStyle('PRIMARY')
+            .setStyle(ButtonStyle.Primary)
             .setDisabled(true),
         );
       }
@@ -5622,17 +5905,17 @@ if(command === "forfeit") {
           { name: six[2][0], value: six[2][1].toLocaleString(undefined) + ' zeni', inline:true },
         );
         row.addComponents(
-          new MessageButton()
+          new ButtonBuilder()
             .setCustomId('three')
             .setLabel(six[2][0])
-            .setStyle('PRIMARY'),
+            .setStyle(ButtonStyle.Primary),
         );
       }
       row.addComponents(
-        new MessageButton()
+        new ButtonBuilder()
           .setCustomId('right')
           .setLabel('➡')
-          .setStyle('PRIMARY'),
+          .setStyle(ButtonStyle.Primary),
         );
 
       page1Embed.setFooter({ text: 'Button to socket stat. You have ' + player.zeni.toLocaleString(undefined) + ' zeni.\nPage ' + page });
@@ -5825,7 +6108,7 @@ if(command === "forfeit") {
         for(let i = 0; i < activeCombatList[battleID].pCombatants.length; i++) {
           let chance = Math.round(Math.random() * 99 + 1);
           if(activeCombatList[battleID].deathChance != 0 && chance < activeCombatList[battleID].deathChance) {
-            let user = getCharList(activeCombatList[battleID].pCombatants[i].playerID);
+            let user = Helpers.getCharList(activeCombatList[battleID].pCombatants[i].playerID, users);
             let zeni = (activeCombatList[battleID].pCombatants[i].level+activeCombatList[battleID].pCombatants[i].attributes.stotal)*15;
             user.zeni = user.zeni - zeni;
             let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(activeCombatList[battleID].pCombatants[i].playerID+activeCombatList[battleID].pCombatants[i].name);
@@ -5874,7 +6157,7 @@ if(command === "forfeit") {
           let str = "";
 
           if(activeCombatList[battleID].NPCombatants[i].playerID !== "NPC" && activeCombatList[battleID].NPCombatants[i].playerID !== "Random") {
-            let user = getCharList(activeCombatList[battleID].NPCombatants[i].playerID);
+            let user = Helpers.getCharList(activeCombatList[battleID].NPCombatants[i].playerID, users);
             let chance = Math.round(Math.random() * 100);
             let availableTechs = new Array();
 
@@ -5992,7 +6275,7 @@ if(command === "forfeit") {
           let str = "";
           let xp = 1+Math.round(activeCombatList[battleID].expMod * exp * (nplv / activeCombatList[battleID].pCombatants[i].level) / 2);
           //let str = activeCombatList[battleID].pCombatants[i].addEXP(xp);
-          let user = getCharList(activeCombatList[battleID].pCombatants[i].playerID);
+          let user = Helpers.getCharList(activeCombatList[battleID].pCombatants[i].playerID, users);
           let chance = Math.round(Math.random() * 100);
 
           if(activeCombatList[battleID].zeniRisk > 0) zeni += activeCombatList[battleID].zeniRisk*2;
@@ -6039,7 +6322,7 @@ if(command === "forfeit") {
 
           if(user !== null && activeCombatList[battleID].itemBox !== "None") {
             let rng = Math.random() < 0.5 ? "weapon" : "dogi";
-            let item = makeItem(rng, activeCombatList[battleID].itemBox.toLowerCase());
+            let item = Helpers.makeItem(rng, activeCombatList[battleID].itemBox.toLowerCase(), itemList);
 
             if(user.itemInventory.addItem(item) === 1) {
               battleMessage(activeCombatList[battleID].pCombatants[i].name + " has earned an item! You have " + (user.itemInventory.maxSize - user.itemInventory.items.length) + " item slots left.");
@@ -6062,7 +6345,7 @@ if(command === "forfeit") {
       msg.channel.send("Action set.");
     }
   }
-//endz
+
   function endBattle(battleID, playerWin) {
     let danger = activeCombatList[battleID].deathChance;
     for(let i = 0; i < activeCombatList[battleID].pCombatants.length; i++) {
@@ -6087,19 +6370,19 @@ if(command === "forfeit") {
             charList[z].zenkaiTriggered = activeCombatList[battleID].pCombatants[i].zenkaiTriggered;
             charList[z].gainZenkai();
           } 
-          let index = getCharListIndex(charList[z].playerID);
+          let index = Helpers.getCharListIndex(charList[z].playerID, users);
           if(users[index].tutorial === 1) {
             let str = Help.tutorial(2);
-            let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Tutorial: ' + charList[z].name.replace(/\_/g,' '));
+            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Tutorial: ' + charList[z].name.replace(/\_/g,' '));
             currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png")
             currEmbed.setDescription(str);
             msg.channel.send({ embeds: [currEmbed] });
           }
           if(activeCombatList[battleID].raid !== 0 && playerWin === 1) {
-            let ui = getCharListIndex(charList[z].playerID);
+            let ui = Helpers.getCharListIndex(charList[z].playerID, users);
             let str = Raid.raidReward(activeCombatList[battleID].raid,charList[z],users[ui]);
             if(str !== "") {
-              let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Congratulations ' + charList[z].name.replace(/\_/g,' '));
+              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Congratulations ' + charList[z].name.replace(/\_/g,' '));
               currEmbed.setDescription(str);
               msg.channel.send({ embeds: [currEmbed] });
             }
@@ -6135,1035 +6418,998 @@ if(command === "forfeit") {
       }
     }
     activeCombatList.splice(battleID,1);
+    loader.inventorySaver(invList);
     loader.characterSaver(charList);
     loader.npcSaver(npcList);
     loader.userSaver(users);
   }
 
-  function checkBattles(ID,charName) {
-    for(let i = 0; i < activeCombatList.length; i++) {
-      for(let j = 0; j < activeCombatList[i].pCombatants.length; j++) {
-        if(ID === activeCombatList[i].pCombatants[j].playerID && charName === activeCombatList[i].pCombatants[j].name) {
-          return 1;
+function battleMessage(text) {
+  let currEmbed = new Discord.EmbedBuilder(messageEmbed);
+  currEmbed.setDescription(text);
+  msg.channel.send({ embeds: [currEmbed] });
+}
+
+function userTechPrint(user) {
+    msg.channel.send('<@'+user.userID+'>');
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Unlocked Techniques');
+    let str;
+
+    for(let i = 0; i < user.tags.length; i++) {
+      str = '*TechID*  ' + techList[user.tags[i]].UID + '\n';
+      if(techList[user.tags[i]].techType === 'Transform') {
+        str += '*Type*  Transformation\n';
+        str += '*EP Cost*  ' + techList[user.tags[i]].energyCost.toLocaleString(undefined) + '%\n';
+        str += '*HP Cost*  ' + techList[user.tags[i]].healthCost.toLocaleString(undefined) + '%\n';
+        if(techList[user.tags[i]].tag !== "None") str += '*Race Req*  ' + techList[user.tags[i]].tag.toLocaleString(undefined) + '\n';
+        str += '**Modifiers**'; 
+        str += techList[user.tags[i]].attBonus.outputBonusStr();
+        currEmbed.addFields({ name:'**'+techList[user.tags[i]].name.replace(/\_/g,' ')+'**', value:str, inline:true });
+      }
+      else if(techList[user.tags[i]].techType === 'Ki' || techList[user.tags[i]].techType === 'Strike') {
+        str += '*EP Cost*  ' + techList[user.tags[i]].energyCost.toLocaleString(undefined) + '\n';
+        str += '*HP Cost*  ' + techList[user.tags[i]].healthCost.toLocaleString(undefined) + '\n';
+        str += '*Damage Scaling*  ' + techList[user.tags[i]].scalePercent*100 + '%\n';
+        str += '*Flat Damage Scaling*  ' + techList[user.tags[i]].flatDamage + '\n'; 
+        str += '*Hit Number*  ' + techList[user.tags[i]].hits + '\n';
+        str += '*Armor Pen*  ' + techList[user.tags[i]].armorPen + '%\n';
+        str += '*Bonus Hit*  ' + techList[user.tags[i]].hitRate + '%\n';
+        str += '*Bonus Crit*  ' + techList[user.tags[i]].critRate + '%\n';
+        if(techList[user.tags[i]].coolDown > 1) str += '*Cooldown*  ' + (Number(techList[user.tags[i]].coolDown)-1) + ' turns\n';
+        else str += '*Cooldown* ' + techList[user.tags[i]].coolDown + ' turns\n';
+        if(techList[user.tags[i]].allowCharge == 1) str += '*Can be charged*\n';
+        if(techList[user.tags[i]].techType === 'Ki') {
+          str += '*Type*  Energy';
         }
+        else {
+          str += '*Type*  ' + techList[user.tags[i]].techType;
+        }
+        currEmbed.addFields({ name:'**'+techList[user.tags[i]].name.replace(/\_/g,' ')+'**', value:str, inline:true });
+      }
+      else if(techList[user.tags[i]].techType === 'Buff' || techList[user.tags[i]].techType === 'Debuff') {
+        str += '*Type*  ' + techList[user.tags[i]].techType + '\n';
+        str += '*EP Cost*  ' + techList[user.tags[i]].energyCost.toLocaleString(undefined) + '\n';
+        str += '*HP Cost*  ' + techList[user.tags[i]].healthCost.toLocaleString(undefined) + '\n';
+        if(techList[user.tags[i]].coolDown > 1) str += '*Cooldown*  ' + (Number(techList[user.tags[i]].coolDown)-1) + ' turns\n';
+        else str += '*Cooldown* 3 ' + techList[user.tags[i]].coolDown + ' turns\n';
+        str += '*Duration*  ' + techList[user.tags[i]].duration + '\n'; 
+        str += '**Modifiers**';
+        str += techList[user.tags[i]].attBonus.outputBonusStr();
+        currEmbed.addFields({ name:'**'+techList[user.tags[i]].name.replace(/\_/g,' ')+'**', value:str, inline:true });
+      }
+      else if(techList[user.tags[i]].techType === 'Restoration') {
+        str += '*Type*  ' + techList[user.tags[i]].techType + '\n';
+        str += '*EP Cost*  ' + techList[user.tags[i]].energyCost.toLocaleString(undefined) + '\n';
+        str += '*HP Cost*  ' + techList[user.tags[i]].healthCost.toLocaleString(undefined) + '\n';
+        str += '*Restoration Scaling*  ' + techList[user.tags[i]].scalePercent*100 + '%\n';
+        str += '*Flat Restoration Scaling*  ' + techList[user.tags[i]].flatDamage + '\n'; 
+        if(techList[user.tags[i]].energy > 0) str += "Heal Type: Energy\n"
+        else if(techList[user.tags[i]].health > 0) str += "Heal Type: Health\n"
+        if(techList[user.tags[i]].coolDown > 1) str += '*Cooldown*  ' + (Number(techList[user.tags[i]].coolDown)-1) + ' turns\n';
+        else str += '*Cooldown* 3 ' + techList[user.tags[i]].coolDown + ' turns\n';
+        currEmbed.addFields({ name:'**'+techList[user.tags[i]].name.replace(/\_/g,' ')+'**', value:str, inline:true });
+      }
+
+      if(i%20 == 0 && i !== 0) {
+        currEmbed.setFooter({ text: "EP Cost, HP Cost and Flat Damage are multiplied by a character's total stat and level average.\n"});
+        msg.channel.send({ embeds: [currEmbed] });
+        currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Unlocked Techniques');
       }
     }
-    return 0;
-  }
-
-  function getCurrentBattle(ID,charName) {
-    for(let i = 0; i < activeCombatList.length; i++) {
-      for(let j = 0; j < activeCombatList[i].pCombatants.length; j++) {
-        if(ID == activeCombatList[i].pCombatants[j].playerID && charName === activeCombatList[i].pCombatants[j].name) {
-          return i;
-        }
-      }
-      for(let j = 0; j < activeCombatList[i].NPCombatants.length; j++) {
-        if(ID == activeCombatList[i].NPCombatants[j].playerID && charName === activeCombatList[i].NPCombatants[j].name) {
-          return i;
-        }
-      }
-    }
-    return -1;
-  }
-
-  function getCurrentBattleNPC(charName) {
-    for(let i = 0; i < activeCombatList.length; i++) {
-      for(let j = 0; j < activeCombatList[i].NPCombatants.length; j++) {
-        if(charName == activeCombatList[i].NPCombatants[j].name) {
-          return i;
-        }
-      }
-    }
-    return -1;
-  }
-
-  function battleMessage(text) {
-    let currEmbed = new Discord.MessageEmbed(messageEmbed);
-    currEmbed.setDescription(text);
+    currEmbed.setFooter({ text: "EP Cost, HP Cost and Flat Damage are multiplied by a character's total stat and level average.\n"});
     msg.channel.send({ embeds: [currEmbed] });
+}
+
+function charTechPrint(char) {
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(char.name.replace(/\_/g,' ') + "'s Current Techniques");
+    let scaleLvl = Math.round((char.battleCurrAtt.stotal + char.level)/2);
+    let str;
+    if(char.techniques.length >= 1) {
+      str = 'EP Cost ' + (techList[char.techniques[0]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'HP Cost ' + (techList[char.techniques[0]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'Type ' + techList[char.techniques[0]].techType + '\n';
+      if(techList[char.techniques[0]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[0]].coolDown-1);
+      else str += 'CD ' + techList[char.techniques[0]].coolDown;
+      currEmbed.addFields({ name:':one: ' + techList[char.techniques[0]].name.replace(/\_/g,' '), value:str, inline:true });
+    }
+    else {
+      currEmbed.addFields({ name:':one: None', value:'\u200b', inline:true });
+    }
+    if(char.techniques.length >= 2) {
+      str = 'EP Cost ' + (techList[char.techniques[1]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'HP Cost ' + (techList[char.techniques[1]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'Type ' + techList[char.techniques[1]].techType + '\n';
+      if(techList[char.techniques[1]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[1]].coolDown-1);
+      else str += 'CD ' + techList[char.techniques[1]].coolDown;
+      currEmbed.addFields({ name:':two: ' + techList[char.techniques[1]].name.replace(/\_/g,' '), value:str, inline:true });
+    }
+    else {
+      currEmbed.addFields({ name:':two: None', value:'\u200b', inline:true });
+    }
+    if(char.techniques.length >= 3) {
+      str = 'EP Cost ' + (techList[char.techniques[2]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'HP Cost ' + (techList[char.techniques[2]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'Type ' + techList[char.techniques[2]].techType + '\n';
+      if(techList[char.techniques[2]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[2]].coolDown-1);
+      else str += 'CD ' + techList[char.techniques[2]].coolDown;
+      currEmbed.addFields({ name:':three: ' + techList[char.techniques[2]].name.replace(/\_/g,' '), value:str, inline:true }); 
+    }
+    else {
+      currEmbed.addFields({ name:':three: None', value:'\u200b', inline:true });
+    }
+    if(char.techniques.length >= 4) {
+      str = 'EP Cost ' + (techList[char.techniques[3]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'HP Cost ' + (techList[char.techniques[3]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'Type ' + techList[char.techniques[3]].techType + '\n';
+      if(techList[char.techniques[3]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[3]].coolDown-1);
+      else str += 'CD ' + techList[char.techniques[3]].coolDown;
+      currEmbed.addFields({ name:':four: ' + techList[char.techniques[3]].name.replace(/\_/g,' '), value:str, inline:true });
+    }
+    else {
+      currEmbed.addFields({ name:':four: None', value:'\u200b', inline:true });
+    }
+    if(char.techniques.length >= 5) {
+      str = 'EP Cost ' + (techList[char.techniques[4]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'HP Cost ' + (techList[char.techniques[4]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
+      str += 'Type ' + techList[char.techniques[4]].techType + '\n';
+      if(techList[char.techniques[4]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[4]].coolDown-1);
+      else str += 'CD ' + techList[char.techniques[4]].coolDown;
+      currEmbed.addFields({ name:':five: ' + techList[char.techniques[4]].name.replace(/\_/g,' '), value:str, inline:true });
+    }
+    else {
+      currEmbed.addFields({ name:':five: None', value:'\u200b', inline:true });
+    }
+
+    if(char.transformation !== -1) {
+      str = 'EP Cost ' + Math.round(techList[char.transformation].energyCost/100*char.battleMaxAtt.energy).toLocaleString(undefined) + '\n';
+      str += 'HP Cost ' + Math.round(techList[char.transformation].healthCost/100*char.battleMaxAtt.health).toLocaleString(undefined) + '\n';
+      currEmbed.addFields({ name:'<:t_red:832763572919992390> ' + techList[char.transformation].name.replace(/\_/g,' '), value:str, inline:true });
+    }
+    else {
+      currEmbed.addFields({ name:'<:t_red:832763572919992390> None', value:'\u200b', inline:true });
+    }
+
+    msg.channel.send({ embeds: [currEmbed] });
+}
+
+function printBattleList(battle,battleEnd) {
+  for(let i = 0; i < battle.NPCombatants.length; i++) {
+    if(battle.NPCombatants[i].playerID === 'NPC' || battle.NPCombatants[i].playerID === 'Random') {
+      battlePrint(-1,battle.NPCombatants[i],i,battleEnd);
+    }
+    else {
+      let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(battle.NPCombatants[i].playerID+battle.NPCombatants[i].name);
+      //let z = charList.indexOf(battle.NPCombatants[i])
+      battlePrint(1,z,i,battleEnd);
+    }
+  }
+  for(let i = 0; i < battle.pCombatants.length; i++) {
+    if(battle.pCombatants[i].playerID === 'NPC' || battle.pCombatants[i].playerID === 'Random') {
+      battlePrint(-1,battle.pCombatants[i],i,battleEnd);
+    }
+    else {
+      let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(battle.pCombatants[i].playerID+battle.pCombatants[i].name);
+      //let z = charList.indexOf(battle.pCombatants[i])
+      battlePrint(1,z,i,battleEnd);
+    }
+  }
+}
+
+function playerEmbed(ID,placement,battleEnd, team) {
+
+  index = ID;
+  let bcheck = Helpers.getCurrentBattle(charList[index].playerID, charList[index].name);
+  let char;
+  let combatList = new Array();
+  const selectTarget = new SelectMenuBuilder();
+  selectTarget.setCustomId('target');
+  selectTarget.setPlaceholder('Select Target');
+
+  for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+      combatList.push(activeCombatList[bcheck].pCombatants[i]);
+      if(activeCombatList[bcheck].raid !== 0 && team === 0) {
+        selectTarget.addOptions([
+          {
+            label: "Ally",
+            value: 'a' + i.toLocaleString(),
+            description: activeCombatList[bcheck].pCombatants[i].name.replace(/\_/g,' '),
+          },
+        ]);
+      }
+      else if(activeCombatList[bcheck].raid !== 0 && team === 1) {
+        selectTarget.addOptions([
+          {
+            label: "Enemy",
+            value: 'e' + i.toLocaleString(),
+            description: activeCombatList[bcheck].pCombatants[i].name.replace(/\_/g,' '),
+          },
+        ]);
+      }
+  }
+  for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+    combatList.push(activeCombatList[bcheck].NPCombatants[i]);
+      if(activeCombatList[bcheck].raid !== 0 && team === 0) {
+        selectTarget.addOptions([
+          {
+            label: "Enemy",
+            value: 'e' + i.toLocaleString(),
+            description: activeCombatList[bcheck].NPCombatants[i].name.replace(/\_/g,' '),
+          },
+        ]);
+      }
+      else if(activeCombatList[bcheck].raid !== 0 && team === 1) {
+        selectTarget.addOptions([
+          {
+            label: "Ally",
+            value: 'a' + i.toLocaleString(),
+            description: activeCombatList[bcheck].NPCombatants[i].name.replace(/\_/g,' '),
+          },
+        ]);
+      }
+  }
+  for(let i = 0; i < combatList.length; i++) {
+    if(combatList[i].name === charList[index].name) {
+      char = combatList[i];
+      break;
+    }
   }
 
-  function userTechPrint(user) {
-      msg.channel.send('<@'+user.userID+'>');
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Unlocked Techniques');
-      let str;
+  let name = char.name.replace(/\_/g,' ');
+  if(char.isTransformed !== -1) {
+    if(techList[char.transformation].name == "Potential_Unleashed" || techList[char.transformation].name.search("Saiyan") !== -1) {
+      name = techList[char.transformation].name.replace(/\_/g,' ') + ' ' + char.name.replace(/\_/g,' ');
+    }
+    else name += ', ' + techList[char.transformation].name.replace(/\_/g,' ');
+  }
 
-      for(let i = 0; i < user.tags.length; i++) {
-        str = '*TechID*  ' + techList[user.tags[i]].UID + '\n';
-        if(techList[user.tags[i]].techType === 'Transform') {
-          str += '*Type*  Transformation\n';
-          str += '*EP Cost*  ' + techList[user.tags[i]].energyCost.toLocaleString(undefined) + '%\n';
-          str += '*HP Cost*  ' + techList[user.tags[i]].healthCost.toLocaleString(undefined) + '%\n';
-          if(techList[user.tags[i]].tag !== "None") str += '*Race Req*  ' + techList[user.tags[i]].tag.toLocaleString(undefined) + '\n';
-          str += '**Modifiers**'; 
-          str += techList[user.tags[i]].attBonus.outputBonusStr();
-          currEmbed.addField('**'+techList[user.tags[i]].name.replace(/\_/g,' ')+'**', str, true);
+  let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(name);
+  if(char.image === '' || char.image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
+  else { currEmbed.setThumbnail(char.image); }
+
+  let hpPercent = Math.round((char.battleCurrAtt.health/char.battleMaxAtt.health)*5);
+  let energyPercent = Math.round((char.battleCurrAtt.energy/char.battleMaxAtt.energy)*5);
+  let chargePercent = Math.round((char.battleCurrAtt.charge/char.battleMaxAtt.charge)*5);
+  let hpStr = "";
+  let engStr = "";
+  let chargeStr = "";
+  for(let i = 0; i < 5; i++) {
+    if(i < hpPercent) {
+      hpStr += "🟥";
+    }
+    else {
+      hpStr += "⬛";
+    }
+    if(i < energyPercent) {
+      engStr += "🟦";
+    }
+    else {
+      engStr += "⬛";
+    }
+    if(i < chargePercent) {
+      chargeStr += "🟨";
+    }
+    else {
+      chargeStr += "⬛";
+    }
+  }
+  hpStr += '\n' + char.battleCurrAtt.health.toLocaleString(undefined) + '/' + char.battleMaxAtt.health.toLocaleString(undefined);
+  engStr += '\n' + char.battleCurrAtt.energy.toLocaleString(undefined) + '/' + char.battleMaxAtt.energy.toLocaleString(undefined);
+  chargeStr += '\n' + char.battleCurrAtt.charge.toLocaleString(undefined) + '/' + char.battleMaxAtt.charge.toLocaleString(undefined);
+  currEmbed.addFields(
+    { name: 'Race', value: char.race.raceName.replace(/\_/g,' ').toLocaleString(), inline:true },
+    //{ name: 'Level', value: char.level.toLocaleString(), inline: true  },
+    //{ name: 'Attribute Total', value: char.battleCurrAtt.stotal.toLocaleString(), inline: true  },
+    { name: 'Power Level', value: char.battleCurrAtt.scanPowerLevel(char.battleCurrAtt.charge,char.level).toLocaleString(undefined), inline: true },
+    //{ name: '\u200b', value: '\u200b', inline: true  },
+    { name: 'Team ' + (team+1).toLocaleString(), value: 'Slot ' + placement.toLocaleString(), inline: true  },
+
+    { name: ':red_circle: Health', value: hpStr, inline: true },
+    //{ name: '\u200b', value: '\u200b', inline: true  },
+    { name: ':blue_circle: Energy', value: engStr, inline: true },
+    { name: ':yellow_circle: Charge', value: chargeStr, inline: true },
+  );
+
+  if(activeCombatList[bcheck].raid === 0) {
+    let dogiN = "None";
+    let weaponN = "None";
+    if(char.dogi !== null) dogiN = char.dogi.name.replace(/\_/g,' ');
+    if(char.weapon !== null) weaponN = char.weapon.name.replace(/\_/g,' ');
+    currEmbed.addFields(
+      { name: 'Dogi', value: dogiN, inline: true  },
+      { name: 'Weapon', value: weaponN, inline: true  },
+        { name: 'Fighting Style', value: char.styleName.replace(/\_/g,' '), inline: true  }
+    );
+  }
+
+  let scaleLvl = Math.round((char.battleCurrAtt.stotal + char.level)/2);
+  const row1 = new ActionRowBuilder();
+  const row2 = new ActionRowBuilder();
+  const select = new SelectMenuBuilder();
+  select.setCustomId('techs');
+  select.setPlaceholder('Select Technique');
+  row2.addComponents(
+    new ButtonBuilder()
+      .setCustomId('strike')
+      .setLabel('Strike')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('burst')
+      .setLabel('Burst')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('charge')
+      .setLabel('Charge')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('techcharge')
+      .setLabel('Toggle Charge')
+      .setStyle(ButtonStyle.Danger),
+  );
+  let str;
+  let cstr = "";
+
+  if(char.techniques.length >= 1 && battleEnd !== 1) {
+      for(let i = 0; i < char.techniques.length; i++) {
+        if(techList[char.techniques[i]].energyCost > 0) str = (techList[char.techniques[i]].energyCost*scaleLvl).toLocaleString(undefined) + 'EP|\n';
+        if(techList[char.techniques[i]].healthCost > 0) str += (techList[char.techniques[i]].healthCost*scaleLvl).toLocaleString(undefined) + 'HP|\n';
+         + '| \n';
+        if(techList[char.techniques[i]].scalePercent !== 0 && techList[char.techniques[i]].flatDamage !== 0 &&
+          techList[char.techniques[i]].techType !== "Transform") {
+          str += (techList[char.techniques[i]].scalePercent*100).toLocaleString(undefined) + '%+';
+          str += (techList[char.techniques[i]].flatDamage).toLocaleString(undefined);
+          if( techList[char.techniques[i]].hits > 0) str += ' x' + (techList[char.techniques[i]].hits).toLocaleString(undefined);
+          if(techList[char.techniques[i]].techType === "Restoration" && techList[char.techniques[i]].health > 0) str += ' healing|\n'
+          else if(techList[char.techniques[i]].techType === "Restoration" && techList[char.techniques[i]].energy > 0) str += ' energy restore|\n'
+          else str += ' damage| \n'
         }
-        else if(techList[user.tags[i]].techType === 'Ki' || techList[user.tags[i]].techType === 'Strike') {
-          str += '*EP Cost*  ' + techList[user.tags[i]].energyCost.toLocaleString(undefined) + '\n';
-          str += '*HP Cost*  ' + techList[user.tags[i]].healthCost.toLocaleString(undefined) + '\n';
-          str += '*Damage Scaling*  ' + techList[user.tags[i]].scalePercent*100 + '%\n';
-          str += '*Flat Damage Scaling*  ' + techList[user.tags[i]].flatDamage + '\n'; 
-          str += '*Hit Number*  ' + techList[user.tags[i]].hits + '\n';
-          str += '*Armor Pen*  ' + techList[user.tags[i]].armorPen + '%\n';
-          str += '*Bonus Hit*  ' + techList[user.tags[i]].hitRate + '%\n';
-          str += '*Bonus Crit*  ' + techList[user.tags[i]].critRate + '%\n';
-          if(techList[user.tags[i]].coolDown > 1) str += '*Cooldown*  ' + (Number(techList[user.tags[i]].coolDown)-1) + ' turns\n';
-          else str += '*Cooldown* ' + techList[user.tags[i]].coolDown + ' turns\n';
-          if(techList[user.tags[i]].allowCharge == 1) str += '*Can be charged*\n';
-          if(techList[user.tags[i]].techType === 'Ki') {
-            str += '*Type*  Energy';
+
+        if(techList[char.techniques[i]].techType === "Buff") {
+          if(techList[char.techniques[i]].guardTarget > 0) {
+            cstr = " [Guard] | " + techList[char.techniques[i]].duration + " turn duration";
           }
           else {
-            str += '*Type*  ' + techList[user.tags[i]].techType;
+            cstr = " | " + techList[char.techniques[i]].duration + " turn duration";
           }
-          currEmbed.addField('**'+techList[user.tags[i]].name.replace(/\_/g,' ')+'**', str, true);
-        }
-        else if(techList[user.tags[i]].techType === 'Buff' || techList[user.tags[i]].techType === 'Debuff') {
-          str += '*Type*  ' + techList[user.tags[i]].techType + '\n';
-          str += '*EP Cost*  ' + techList[user.tags[i]].energyCost.toLocaleString(undefined) + '\n';
-          str += '*HP Cost*  ' + techList[user.tags[i]].healthCost.toLocaleString(undefined) + '\n';
-          if(techList[user.tags[i]].coolDown > 1) str += '*Cooldown*  ' + (Number(techList[user.tags[i]].coolDown)-1) + ' turns\n';
-          else str += '*Cooldown* 3 ' + techList[user.tags[i]].coolDown + ' turns\n';
-          str += '*Duration*  ' + techList[user.tags[i]].duration + '\n'; 
-          str += '**Modifiers**';
-          str += techList[user.tags[i]].attBonus.outputBonusStr();
-          currEmbed.addField('**'+techList[user.tags[i]].name.replace(/\_/g,' ')+'**', str, true);
-        }
-        else if(techList[user.tags[i]].techType === 'Restoration') {
-          str += '*Type*  ' + techList[user.tags[i]].techType + '\n';
-          str += '*EP Cost*  ' + techList[user.tags[i]].energyCost.toLocaleString(undefined) + '\n';
-          str += '*HP Cost*  ' + techList[user.tags[i]].healthCost.toLocaleString(undefined) + '\n';
-          str += '*Restoration Scaling*  ' + techList[user.tags[i]].scalePercent*100 + '%\n';
-          str += '*Flat Restoration Scaling*  ' + techList[user.tags[i]].flatDamage + '\n'; 
-          if(techList[user.tags[i]].energy > 0) str += "Heal Type: Energy\n"
-          else if(techList[user.tags[i]].health > 0) str += "Heal Type: Health\n"
-          if(techList[user.tags[i]].coolDown > 1) str += '*Cooldown*  ' + (Number(techList[user.tags[i]].coolDown)-1) + ' turns\n';
-          else str += '*Cooldown* 3 ' + techList[user.tags[i]].coolDown + ' turns\n';
-          currEmbed.addField('**'+techList[user.tags[i]].name.replace(/\_/g,' ')+'**', str, true);
+        } 
+        else if(techList[char.techniques[i]].allowCharge !== 0) {
+          cstr = " [Charge] ";
+        } 
+        else {
+          cstr = "";
         }
 
-        if(i%20 == 0 && i !== 0) {
-          currEmbed.setFooter({ text: "EP Cost, HP Cost and Flat Damage are multiplied by a character's total stat and level average.\n"});
-          msg.channel.send({ embeds: [currEmbed] });
-          currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle('Unlocked Techniques');
+        if(techList[char.techniques[i]].armorPen !== 0) str += (techList[char.techniques[i]].armorPen).toLocaleString(undefined) + '% pen|\n';
+        if(techList[char.techniques[i]].critRate !== 0) str += (techList[char.techniques[i]].critRate).toLocaleString(undefined) + '% crit|\n';
+
+        if(char.techCooldowns[i] > 0) cstr += ' - ' + char.techCooldowns[i] + ' turn CD';
+        else cstr += ' - Ready';
+        //currEmbed.addField(':one: ' + techList[char.techniques[0]].name.replace(/\_/g,' '), str, true);
+        let emoja;
+
+        if(char.techCooldowns[i] > 0) {
+          emoja = '⬛';
         }
-      }
-      currEmbed.setFooter({ text: "EP Cost, HP Cost and Flat Damage are multiplied by a character's total stat and level average.\n"});
-      msg.channel.send({ embeds: [currEmbed] });
-  }
+        else if(techList[char.techniques[i]].techType === "Restoration") {
+          emoja = '🟩';
+        }
+        else if(techList[char.techniques[i]].techType === "Ki") {
+          emoja = '🟦';
+        }
+        else if(techList[char.techniques[i]].techType === "Strike") {
+          emoja = '🟧';
+        }
+        else if(techList[char.techniques[i]].techType === "Buff") {
+          emoja = '⬜';
+        }
+        else if(techList[char.techniques[i]].techType === "Debuff") {
+          emoja = '🟪';
+        }
 
-  function charTechPrint(char) {
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(char.name.replace(/\_/g,' ') + "'s Current Techniques");
-      let scaleLvl = Math.round((char.battleCurrAtt.stotal + char.level)/2);
-      let str;
-      if(char.techniques.length >= 1) {
-        str = 'EP Cost ' + (techList[char.techniques[0]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'HP Cost ' + (techList[char.techniques[0]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'Type ' + techList[char.techniques[0]].techType + '\n';
-        if(techList[char.techniques[0]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[0]].coolDown-1);
-        else str += 'CD ' + techList[char.techniques[0]].coolDown;
-        currEmbed.addField(':one: ' + techList[char.techniques[0]].name.replace(/\_/g,' '), str, true);
-      }
-      else {
-        currEmbed.addField(':one: None', '\u200b', true);
-      }
-      if(char.techniques.length >= 2) {
-        str = 'EP Cost ' + (techList[char.techniques[1]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'HP Cost ' + (techList[char.techniques[1]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'Type ' + techList[char.techniques[1]].techType + '\n';
-        if(techList[char.techniques[1]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[1]].coolDown-1);
-        else str += 'CD ' + techList[char.techniques[1]].coolDown;
-        currEmbed.addField(':two: ' + techList[char.techniques[1]].name.replace(/\_/g,' '), str, true);
-      }
-      else {
-        currEmbed.addField(':two: None', '\u200b', true);
-      }
-      if(char.techniques.length >= 3) {
-        str = 'EP Cost ' + (techList[char.techniques[2]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'HP Cost ' + (techList[char.techniques[2]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'Type ' + techList[char.techniques[2]].techType + '\n';
-        if(techList[char.techniques[2]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[2]].coolDown-1);
-        else str += 'CD ' + techList[char.techniques[2]].coolDown;
-        currEmbed.addField(':three: ' + techList[char.techniques[2]].name.replace(/\_/g,' '), str, true); 
-      }
-      else {
-        currEmbed.addField(':three: None', '\u200b', true);
-      }
-      if(char.techniques.length >= 4) {
-        str = 'EP Cost ' + (techList[char.techniques[3]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'HP Cost ' + (techList[char.techniques[3]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'Type ' + techList[char.techniques[3]].techType + '\n';
-        if(techList[char.techniques[3]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[3]].coolDown-1);
-        else str += 'CD ' + techList[char.techniques[3]].coolDown;
-        currEmbed.addField(':four: ' + techList[char.techniques[3]].name.replace(/\_/g,' '), str, true);
-      }
-      else {
-        currEmbed.addField(':four: None', '\u200b', true);
-      }
-      if(char.techniques.length >= 5) {
-        str = 'EP Cost ' + (techList[char.techniques[4]].energyCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'HP Cost ' + (techList[char.techniques[4]].healthCost*scaleLvl).toLocaleString(undefined) + '\n';
-        str += 'Type ' + techList[char.techniques[4]].techType + '\n';
-        if(techList[char.techniques[4]].coolDown > 1) str += 'CD ' + Number(techList[char.techniques[4]].coolDown-1);
-        else str += 'CD ' + techList[char.techniques[4]].coolDown;
-        currEmbed.addField(':five: ' + techList[char.techniques[4]].name.replace(/\_/g,' '), str, true);
-      }
-      else {
-        currEmbed.addField(':five: None', '\u200b', true);
-      }
-
-      if(char.transformation !== -1) {
-        str = 'EP Cost ' + Math.round(techList[char.transformation].energyCost/100*char.battleMaxAtt.energy).toLocaleString(undefined) + '\n';
-        str += 'HP Cost ' + Math.round(techList[char.transformation].healthCost/100*char.battleMaxAtt.health).toLocaleString(undefined) + '\n';
-        currEmbed.addField('<:t_red:832763572919992390> ' + techList[char.transformation].name.replace(/\_/g,' '), str, true);
-      }
-      else {
-        currEmbed.addField('<:t_red:832763572919992390> None', '\u200b', true);
-      }
-
-      msg.channel.send({ embeds: [currEmbed] });
-  }
-
-  function printBattleList(battle,battleEnd) {
-    for(let i = 0; i < battle.NPCombatants.length; i++) {
-      if(battle.NPCombatants[i].playerID === 'NPC' || battle.NPCombatants[i].playerID === 'Random') {
-        battlePrint(-1,battle.NPCombatants[i],i,battleEnd);
-      }
-      else {
-        let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(battle.NPCombatants[i].playerID+battle.NPCombatants[i].name);
-        //let z = charList.indexOf(battle.NPCombatants[i])
-        battlePrint(1,z,i,battleEnd);
-      }
-    }
-    for(let i = 0; i < battle.pCombatants.length; i++) {
-      if(battle.pCombatants[i].playerID === 'NPC' || battle.pCombatants[i].playerID === 'Random') {
-        battlePrint(-1,battle.pCombatants[i],i,battleEnd);
-      }
-      else {
-        let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(battle.pCombatants[i].playerID+battle.pCombatants[i].name);
-        //let z = charList.indexOf(battle.pCombatants[i])
-        battlePrint(1,z,i,battleEnd);
-      }
+        select.addOptions([
+          {
+            label: techList[char.techniques[i]].name.replace(/\_/g,' ') + cstr,
+            value: i.toLocaleString(),
+            description: str,
+            emoji: emoja
+          },
+        ]);
     }
   }
-
-  function playerEmbed(ID,placement,battleEnd, team) {
-      index = ID;
-      let bcheck = getCurrentBattle(charList[index].playerID, charList[index].name);
-      let char;
-      let combatList = new Array();
-      const selectTarget = new MessageSelectMenu();
-      selectTarget.setCustomId('target');
-      selectTarget.setPlaceholder('Select Target');
-
-      for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-          combatList.push(activeCombatList[bcheck].pCombatants[i]);
-          if(activeCombatList[bcheck].raid !== 0 && team === 0) {
-            selectTarget.addOptions([
-              {
-                label: "Ally",
-                value: 'a' + i.toLocaleString(),
-                description: activeCombatList[bcheck].pCombatants[i].name.replace(/\_/g,' '),
-              },
-            ]);
-          }
-          else if(activeCombatList[bcheck].raid !== 0 && team === 1) {
-            selectTarget.addOptions([
-              {
-                label: "Enemy",
-                value: 'e' + i.toLocaleString(),
-                description: activeCombatList[bcheck].pCombatants[i].name.replace(/\_/g,' '),
-              },
-            ]);
-          }
-      }
-      for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-        combatList.push(activeCombatList[bcheck].NPCombatants[i]);
-          if(activeCombatList[bcheck].raid !== 0 && team === 0) {
-            selectTarget.addOptions([
-              {
-                label: "Enemy",
-                value: 'e' + i.toLocaleString(),
-                description: activeCombatList[bcheck].NPCombatants[i].name.replace(/\_/g,' '),
-              },
-            ]);
-          }
-          else if(activeCombatList[bcheck].raid !== 0 && team === 1) {
-            selectTarget.addOptions([
-              {
-                label: "Ally",
-                value: 'a' + i.toLocaleString(),
-                description: activeCombatList[bcheck].NPCombatants[i].name.replace(/\_/g,' '),
-              },
-            ]);
-          }
-      }
-      for(let i = 0; i < combatList.length; i++) {
-        if(combatList[i].name === charList[index].name) {
-          char = combatList[i];
-          break;
-        }
-      }
-
-      let name = char.name.replace(/\_/g,' ');
-      if(char.isTransformed !== -1) {
-        if(techList[char.transformation].name == "Potential_Unleashed" || techList[char.transformation].name.search("Saiyan") !== -1) {
-          name = techList[char.transformation].name.replace(/\_/g,' ') + ' ' + char.name.replace(/\_/g,' ');
-        }
-        else name += ', ' + techList[char.transformation].name.replace(/\_/g,' ');
-      }
-
-      let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(name);
-      if(char.image === '' || char.image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
-      else { currEmbed.setThumbnail(char.image); }
-
-      let hpPercent = Math.round((char.battleCurrAtt.health/char.battleMaxAtt.health)*5);
-      let energyPercent = Math.round((char.battleCurrAtt.energy/char.battleMaxAtt.energy)*5);
-      let chargePercent = Math.round((char.battleCurrAtt.charge/char.battleMaxAtt.charge)*5);
-      let hpStr = "";
-      let engStr = "";
-      let chargeStr = "";
-      for(let i = 0; i < 5; i++) {
-        if(i < hpPercent) {
-          hpStr += "🟥";
-        }
-        else {
-          hpStr += "⬛";
-        }
-        if(i < energyPercent) {
-          engStr += "🟦";
-        }
-        else {
-          engStr += "⬛";
-        }
-        if(i < chargePercent) {
-          chargeStr += "🟨";
-        }
-        else {
-          chargeStr += "⬛";
-        }
-      }
-      hpStr += '\n' + char.battleCurrAtt.health.toLocaleString(undefined) + '/' + char.battleMaxAtt.health.toLocaleString(undefined);
-      engStr += '\n' + char.battleCurrAtt.energy.toLocaleString(undefined) + '/' + char.battleMaxAtt.energy.toLocaleString(undefined);
-      chargeStr += '\n' + char.battleCurrAtt.charge.toLocaleString(undefined) + '/' + char.battleMaxAtt.charge.toLocaleString(undefined);
-      currEmbed.addFields(
-        { name: 'Race', value: char.race.raceName.replace(/\_/g,' ').toLocaleString(), inline:true },
-        //{ name: 'Level', value: char.level.toLocaleString(), inline: true  },
-        //{ name: 'Attribute Total', value: char.battleCurrAtt.stotal.toLocaleString(), inline: true  },
-        { name: 'Power Level', value: char.battleCurrAtt.scanPowerLevel(char.battleCurrAtt.charge,char.level).toLocaleString(undefined), inline: true },
-        //{ name: '\u200b', value: '\u200b', inline: true  },
-        { name: 'Team ' + (team+1).toLocaleString(), value: 'Slot ' + placement.toLocaleString(), inline: true  },
-
-        { name: ':red_circle: Health', value: hpStr, inline: true },
-        //{ name: '\u200b', value: '\u200b', inline: true  },
-        { name: ':blue_circle: Energy', value: engStr, inline: true },
-        { name: ':yellow_circle: Charge', value: chargeStr, inline: true },
-      );
-
-      if(activeCombatList[bcheck].raid === 0) {
-        let dogiN = "None";
-        let weaponN = "None";
-        if(char.dogi !== null) dogiN = char.dogi.name.replace(/\_/g,' ');
-        if(char.weapon !== null) weaponN = char.weapon.name.replace(/\_/g,' ');
-        currEmbed.addFields(
-          { name: 'Dogi', value: dogiN, inline: true  },
-          { name: 'Weapon', value: weaponN, inline: true  },
-            { name: 'Fighting Style', value: char.styleName.replace(/\_/g,' '), inline: true  }
-        );
-      }
-
-      let scaleLvl = Math.round((char.battleCurrAtt.stotal + char.level)/2);
-      const row1 = new MessageActionRow();
-      const row2 = new MessageActionRow();
-      const select = new MessageSelectMenu();
-      select.setCustomId('techs');
-      select.setPlaceholder('Select Technique');
-      row2.addComponents(
-        new MessageButton()
-          .setCustomId('strike')
-          .setLabel('Strike')
-          .setStyle('PRIMARY'),
-        new MessageButton()
-          .setCustomId('burst')
-          .setLabel('Burst')
-          .setStyle('PRIMARY'),
-        new MessageButton()
-          .setCustomId('charge')
-          .setLabel('Charge')
-          .setStyle('SUCCESS'),
-        new MessageButton()
-          .setCustomId('techcharge')
-          .setLabel('Toggle Charge')
-          .setStyle('DANGER'),
-      );
-      let str;
-      let cstr = "";
-
-      if(char.techniques.length >= 1 && battleEnd !== 1) {
-          for(let i = 0; i < char.techniques.length; i++) {
-            if(techList[char.techniques[i]].energyCost > 0) str = (techList[char.techniques[i]].energyCost*scaleLvl).toLocaleString(undefined) + 'EP|\n';
-            if(techList[char.techniques[i]].healthCost > 0) str += (techList[char.techniques[i]].healthCost*scaleLvl).toLocaleString(undefined) + 'HP|\n';
-             + '| \n';
-            if(techList[char.techniques[i]].scalePercent !== 0 && techList[char.techniques[i]].flatDamage !== 0 &&
-              techList[char.techniques[i]].techType !== "Transform") {
-              str += (techList[char.techniques[i]].scalePercent*100).toLocaleString(undefined) + '%+';
-              str += (techList[char.techniques[i]].flatDamage).toLocaleString(undefined);
-              if( techList[char.techniques[i]].hits > 0) str += ' x' + (techList[char.techniques[i]].hits).toLocaleString(undefined);
-              if(techList[char.techniques[i]].techType === "Restoration" && techList[char.techniques[i]].health > 0) str += ' healing|\n'
-              else if(techList[char.techniques[i]].techType === "Restoration" && techList[char.techniques[i]].energy > 0) str += ' energy restore|\n'
-              else str += ' damage| \n'
-            }
-
-            if(techList[char.techniques[i]].techType === "Buff") {
-              if(techList[char.techniques[i]].guardTarget > 0) {
-                cstr = " [Guard] | " + techList[char.techniques[i]].duration + " turn duration";
-              }
-              else {
-                cstr = " | " + techList[char.techniques[i]].duration + " turn duration";
-              }
-            } 
-            else if(techList[char.techniques[i]].allowCharge !== 0) {
-              cstr = " [Charge] ";
-            } 
-            else {
-              cstr = "";
-            }
-
-            if(techList[char.techniques[i]].armorPen !== 0) str += (techList[char.techniques[i]].armorPen).toLocaleString(undefined) + '% pen|\n';
-            if(techList[char.techniques[i]].critRate !== 0) str += (techList[char.techniques[i]].critRate).toLocaleString(undefined) + '% crit|\n';
-
-            if(char.techCooldowns[i] > 0) cstr += ' - ' + char.techCooldowns[i] + ' turn CD';
-            else cstr += ' - Ready';
-            //currEmbed.addField(':one: ' + techList[char.techniques[0]].name.replace(/\_/g,' '), str, true);
-            let emoja;
-
-            if(char.techCooldowns[i] > 0) {
-              emoja = '⬛';
-            }
-            else if(techList[char.techniques[i]].techType === "Restoration") {
-              emoja = '🟩';
-            }
-            else if(techList[char.techniques[i]].techType === "Ki") {
-              emoja = '🟦';
-            }
-            else if(techList[char.techniques[i]].techType === "Strike") {
-              emoja = '🟧';
-            }
-            else if(techList[char.techniques[i]].techType === "Buff") {
-              emoja = '⬜';
-            }
-            else if(techList[char.techniques[i]].techType === "Debuff") {
-              emoja = '🟪';
-            }
-
-            select.addOptions([
-              {
-                label: techList[char.techniques[i]].name.replace(/\_/g,' ') + cstr,
-                value: i.toLocaleString(),
-                description: str,
-                emoji: emoja
-              },
-            ]);
-        }
-      }
-      if(char.transformation !== -1 && battleEnd !== 1) {
-        if(techList[char.transformation].energyCost > 0) str = Math.round(techList[char.transformation].energyCost/100*char.battleMaxAtt.energy).toLocaleString(undefined) + ' EN per round \n';
-        if(techList[char.transformation].healthCost > 0) str += Math.round(techList[char.transformation].healthCost/100*char.battleMaxAtt.health).toLocaleString(undefined) + ' HP per round \n';
-        //currEmbed.addField('<:t_red:832763572919992390> ' + techList[char.transformation].name.replace(/\_/g,' '), str, true);
-          select.addOptions([
-            {
-              label: techList[char.transformation].name.replace(/\_/g,' '),
-              value: char.transformation.toLocaleString(undefined),
-              description: str,
-              emoji:'<:t_red:832763572919992390>',
-            },
-          ]);
-      }
-
-      //msg.channel.send({ embeds: [currEmbed] });
-      let row3 = null;
-      if(activeCombatList[bcheck].raid === 0) {
-        row1.addComponents(select);
-      }
-      else {
-        row1.addComponents(select);
-        row3 = new MessageActionRow();
-        row3.addComponents(selectTarget);
-      }
-      return [currEmbed, row1, row2, row3]
+  if(char.transformation !== -1 && battleEnd !== 1) {
+    if(techList[char.transformation].energyCost > 0) str = Math.round(techList[char.transformation].energyCost/100*char.battleMaxAtt.energy).toLocaleString(undefined) + ' EN per round \n';
+    if(techList[char.transformation].healthCost > 0) str += Math.round(techList[char.transformation].healthCost/100*char.battleMaxAtt.health).toLocaleString(undefined) + ' HP per round \n';
+    //currEmbed.addField('<:t_red:832763572919992390> ' + techList[char.transformation].name.replace(/\_/g,' '), str, true);
+      select.addOptions([
+        {
+          label: techList[char.transformation].name.replace(/\_/g,' '),
+          value: char.transformation.toLocaleString(undefined),
+          description: str,
+          emoji:'<:t_red:832763572919992390>',
+        },
+      ]);
   }
 
-  /********************
-    battlePrint : Prints the stats of a combatant in a battle
-        - pcOrNPC   : Given a value between 0, 1 and -1 which will print assuming the ID is a reference for an NPC, a player or that it's a character object respectively
-        - ID        : This ID is either a reference to npcList/charList or a character object which will be used to print the relevant stats
-        - Placement : The placement in the battle's character list. This is for displaying to people for targetting with skills
-  ********************/
-  function battlePrint(pcOrNPC, ID, placement, battleEnd) {
-    if(battleEnd !== 1) battleEnd = -1;
+  //msg.channel.send({ embeds: [currEmbed] });
+  let row3 = null;
+  if(activeCombatList[bcheck].raid === 0) {
+    row1.addComponents(select);
+  }
+  else {
+    row1.addComponents(select);
+    row3 = new ActionRowBuilder();
+    row3.addComponents(selectTarget);
+  }
+  return [currEmbed, row1, row2, row3]
+}
 
-    if(pcOrNPC === 1) {
-      let team = -5;
-      let bcheck = getCurrentBattle(charList[ID].playerID, charList[ID].name);
-      let char;
-      let combatList = new Array();
-      for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-          combatList.push(activeCombatList[bcheck].pCombatants[i]);
+/********************
+  battlePrint : Prints the stats of a combatant in a battle
+      - pcOrNPC   : Given a value between 0, 1 and -1 which will print assuming the ID is a reference for an NPC, a player or that it's a character object respectively
+      - ID        : This ID is either a reference to npcList/charList or a character object which will be used to print the relevant stats
+      - Placement : The placement in the battle's character list. This is for displaying to people for targetting with skills
+********************/
+function battlePrint(pcOrNPC, ID, placement, battleEnd) {
+  if(battleEnd !== 1) battleEnd = -1;
+
+  if(pcOrNPC === 1) {
+    let team = -5;
+    let bcheck = Helpers.getCurrentBattle(charList[ID].playerID, charList[ID].name);
+    let char;
+    let combatList = new Array();
+    for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+        combatList.push(activeCombatList[bcheck].pCombatants[i]);
+    }
+    for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+      combatList.push(activeCombatList[bcheck].NPCombatants[i]);
+    }
+    for(let i = 0; i < combatList.length; i++) {
+      if(combatList[i].name === charList[ID].name) {
+        char = combatList[i];
+        break;
       }
-      for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-        combatList.push(activeCombatList[bcheck].NPCombatants[i]);
+    }
+    let charName = char.name;
+
+    let combatI = activeCombatList[bcheck].pCombatants.map(function(e) { return e.playerID; }).indexOf(charList[ID].playerID);
+    if(combatI === -1) {
+      combatI = activeCombatList[bcheck].NPCombatants.map(function(e) { return e.playerID; }).indexOf(charList[ID].playerID);
+      team = 1; //NPC team
+    }
+    else team = 0; //player team
+    let embed = playerEmbed(ID,placement,battleEnd, team);
+    let components = new Array();
+    components.push(embed[1]);
+    if(embed[3] !== null) components.push(embed[3]);
+    //if(embed[4] !== null) components.push(embed[4]);
+    components.push(embed[2]);
+
+    if(team === 0 && activeCombatList[bcheck].pCombatants[combatI].battleCurrAtt.health <= 0) {
+      components = new Array()
+      let newRow = new ActionRowBuilder;
+      newRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId('wait')
+          .setLabel('Wait')
+          .setStyle(ButtonStyle.Danger)
+          );
+      components.push(newRow);
+    }
+
+    if(battleEnd === 1) msg.channel.send({ embeds: [embed[0]], components: []});
+    else msg.channel.send({ embeds: [embed[0]], components: components})
+      .then(message => {
+        const filter = (i) => {
+            let z = Helpers.findID(i.user.id, charList, users)
+            if(i.user.id === char.playerID && message.id === i.message.id) {
+              bcheck = Helpers.getCurrentBattle(charList[z].playerID, charList[z].name);
+              return true;
+            }
+            else return false;
+        };
+
+    const collector = msg.channel.createMessageComponentCollector({ filter, time: 1000*60*60*24, max: 1 });
+    collector.on('collect', async i => { 
+      ID = Helpers.findID(i.user.id, charList, users)
+      if(bcheck === -1) {
+        collector.stop();
+        i.update({ embeds: [embed[0]], components: [] });
+        return;
       }
-      for(let i = 0; i < combatList.length; i++) {
-        if(combatList[i].name === charList[ID].name) {
-          char = combatList[i];
-          break;
+      else if(i.customId === 'wait') {
+        let index = -1;
+        for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+            index = i;
+            break;
+          }
         }
+
+        let action = activeCombatList[bcheck].wait();
+        action.push(index);
+        action.push(-1);
+        activeCombatList[bcheck].actions.push(action);
+
+        collector.stop();
+        i.update({ embeds: [embed[0]], components: [] });
+        battleTurn(bcheck);
       }
-      let charName = char.name;
-
-      let combatI = activeCombatList[bcheck].pCombatants.map(function(e) { return e.playerID; }).indexOf(charList[ID].playerID);
-      if(combatI === -1) {
-        combatI = activeCombatList[bcheck].NPCombatants.map(function(e) { return e.playerID; }).indexOf(charList[ID].playerID);
-        team = 1; //NPC team
-      }
-      else team = 0; //player team
-      let embed = playerEmbed(ID,placement,battleEnd, team);
-      let components = new Array();
-      components.push(embed[1]);
-      if(embed[3] !== null) components.push(embed[3]);
-      //if(embed[4] !== null) components.push(embed[4]);
-      components.push(embed[2]);
-
-      if(team === 0 && activeCombatList[bcheck].pCombatants[combatI].battleCurrAtt.health <= 0) {
-        components = new Array()
-        let newRow = new MessageActionRow;
-        newRow.addComponents(
-          new MessageButton()
-            .setCustomId('wait')
-            .setLabel('Wait')
-            .setStyle('DANGER')
-            );
-        components.push(newRow);
-      }
-
-      if(battleEnd === 1) msg.channel.send({ embeds: [embed[0]], components: []});
-      else msg.channel.send({ embeds: [embed[0]], components: components})
-        .then(message => {
-          const filter = (i) => {
-              let z = findID(i.user.id)
-              if(i.user.id === char.playerID && message.id === i.message.id) {
-                bcheck = getCurrentBattle(charList[z].playerID, charList[z].name);
-                return true;
-              }
-              else return false;
-          };
-
-      const collector = msg.channel.createMessageComponentCollector({ filter, time: 1000*60*60*24, max: 1 });
-      collector.on('collect', async i => { 
-        ID = findID(i.user.id)
-        if(bcheck === -1) {
-          collector.stop();
-          i.update({ embeds: [embed[0]], components: [] });
-          return;
+      else if(i.customId === 'target') {
+        let index = -1;
+        for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+            index = i;
+            break;
+          }
         }
-        else if(i.customId === 'wait') {
-          let index = -1;
-          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-                if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+        if(index === -1) {
+            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
               index = i;
               break;
             }
           }
+        }
 
-          let action = activeCombatList[bcheck].wait();
+        message.delete();
+        battlePrint(pcOrNPC, ID, placement, battleEnd);
+        if(i.values[0].charAt(0) === "a") {
+          if(team === 0) activeCombatList[bcheck].pCombatants[index].aTarget = i.values[0].charAt(1);
+          else activeCombatList[bcheck].NPCombatants[index].aTarget = i.values[0].charAt(1);
+          msg.channel.send("Ally Target set to " + i.values[0].charAt(1) + ".");
+        }
+        else {
+          if(team === 0) activeCombatList[bcheck].pCombatants[index].eTarget = i.values[0].charAt(1);
+          else activeCombatList[bcheck].NPCombatants[index].eTarget = i.values[0].charAt(1);
+          msg.channel.send("Enemy Target set to " + i.values[0].charAt(1) + ".");
+        }
+      }
+      else if(i.customId === 'techcharge') {
+        let index = 0;
+        if(team === 0) {
+          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+              index = i;
+              break;
+            }
+          }
+          if(activeCombatList[bcheck].pCombatants[index].isCharging === 1) {
+            activeCombatList[bcheck].pCombatants[index].isCharging = 0;
+            message.delete();
+            battlePrint(pcOrNPC, ID, placement, battleEnd);
+            msg.channel.send("No longer using charge to empower techniques.");
+          }
+          else {
+            activeCombatList[bcheck].pCombatants[index].isCharging = 1;
+            message.delete();
+            battlePrint(pcOrNPC, ID, placement, battleEnd);
+            msg.channel.send("Now using charge to empower techniques.");
+          }
+          return;
+        }
+        else {
+          let index = 0;
+          for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
+              index = i;
+              break;
+            }
+          }
+          if(activeCombatList[bcheck].NPCombatants[index].isCharging === 1) {
+            activeCombatList[bcheck].NPCombatants[index].isCharging = 0;
+            message.delete();
+            battlePrint(pcOrNPC, ID, placement, battleEnd);
+            msg.channel.send("No longer using charge to empower techniques.");
+          }
+          else {
+            activeCombatList[bcheck].NPCombatants[index].isCharging = 1;
+            message.delete();
+            battlePrint(pcOrNPC, ID, placement, battleEnd);
+            msg.channel.send("Now using charge to empower techniques.");
+          }
+          return;
+        }
+      }
+      else if(i.customId === 'techs') {
+        if(team === 1) {
+          if(techList[i.values[0]].techType === "Transform") {
+            let index = 0;
+            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
+                index = i;
+                break;
+              }
+            }
+            let action = activeCombatList[bcheck].transform(activeCombatList[bcheck].NPCombatants[index]);
+            action.push(index);
+            action.push(-1);
+            activeCombatList[bcheck].NPCactions.push(action);
+
+            collector.stop();
+            try {
+              i.update({ embeds: [embed[0]], components: [] })
+                      .then(battleTurn(bcheck));
+            } catch (error) { console.error(error); }
+          }
+          else {
+            let index = 0;
+            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
+                index = i;
+                break;
+              }
+            }
+
+            let techID = activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]];
+            if((techList[techID].techType === "Strike" || techList[techID].techType === "Ki") &&
+              techList[techID].transReq !== "None" && (activeCombatList[bcheck].NPCombatants[index].transformation === -1 
+              || techList[activeCombatList[bcheck].NPCombatants[index].transformation].name.search(techList[techID].transReq) === -1))
+            { 
+              message.delete();
+              battlePrint(pcOrNPC, ID, placement, battleEnd);
+              msg.channel.send("Required transformation not set.");
+              return;
+            }
+
+            if((techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
+              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki"
+              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
+              && (activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) 
+                || activeCombatList[bcheck].NPCombatants[index].eTarget < 0)) {
+                  activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
+            }
+            else if(activeCombatList[bcheck].NPCombatants[index].aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].aTarget < 0) {
+                activeCombatList[bcheck].NPCombatants[index].aTarget = 0;
+            }
+
+            if((techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
+              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki"
+              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
+              && activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
+              let npchar = activeCombatList[bcheck].NPCombatants[index];
+              while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
+                if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
+                else npchar.eTarget++;
+              }
+            }
+            else if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.health <= 0) {
+              let npchar = activeCombatList[bcheck].NPCombatants[index];
+              while((npchar.aTarget < 0 || npchar.aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.aTarget].battleCurrAtt.health <= 0)) {
+                if(npchar.aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.aTarget < 0) npchar.aTarget = 0;
+                else npchar.aTarget++;
+              }
+            }
+
+            if(activeCombatList[bcheck].NPCombatants[index].techCooldowns[i.values[0]] != 0) {
+              message.delete();
+              battlePrint(pcOrNPC, ID, placement, battleEnd);
+              msg.channel.send("Skill on cooldown.");
+              return;
+            }
+
+
+            if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.charge <= 0) activeCombatList[bcheck].NPCombatants[index].isCharging = 0;
+
+            let costMod = Math.round((activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.stotal + activeCombatList[bcheck].NPCombatants[index].level)/2);
+            if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.health <= techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].healthCost*costMod ||
+               activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.energy < techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].energyCost*costMod ||
+               activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.charge 
+               < Math.round(activeCombatList[bcheck].NPCombatants[index].battleMaxAtt.charge * 0.2 * activeCombatList[bcheck].NPCombatants[index].isCharging * techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].allowCharge)) {
+              message.delete();
+              battlePrint(pcOrNPC, ID, placement, battleEnd);
+              msg.channel.send("You don't have the resources for this technique.");
+              return;
+            }
+
+            activeCombatList[bcheck].NPCombatants[index].techCooldowns[i.values[0]] = techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].coolDown;
+            let target;
+            let targetI;
+            if(techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
+              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki" 
+              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") {
+              targetI = activeCombatList[bcheck].NPCombatants[index].eTarget;
+              target = activeCombatList[bcheck].pCombatants[targetI];
+            }
+            else {
+              targetI = activeCombatList[bcheck].NPCombatants[index].aTarget;
+              target = activeCombatList[bcheck].pCombatants[targetI];
+            }
+
+            let action = activeCombatList[bcheck].skill(activeCombatList[bcheck].NPCombatants[index],target,techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]], activeCombatList[bcheck].NPCombatants[index].isCharging);
+            action.push(index);
+            action.push(targetI);
+            activeCombatList[bcheck].NPCactions.push(action);
+
+            collector.stop();
+            try {
+              i.update({ embeds: [embed[0]], components: [] })
+                      .then(battleTurn(bcheck));
+            } catch (error) { console.error(error); }
+          }
+        }
+        else {
+          if(techList[i.values[0]].techType === "Transform") {
+            let index = 0;
+            for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+                index = i;
+                break;
+              }
+            }
+            let action = activeCombatList[bcheck].transform(activeCombatList[bcheck].pCombatants[index]);
+            action.push(index);
+            action.push(-1);
+            activeCombatList[bcheck].actions.push(action);
+
+            collector.stop();
+            try {
+              i.update({ embeds: [embed[0]], components: [] })
+                      .then(battleTurn(bcheck));
+            } catch (error) { console.error(error); }
+          }
+          else {
+            let index = 0;
+            for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+                index = i;
+                break;
+              }
+            }
+
+            let techID = activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]];
+            if((techList[techID].techType === "Strike" || techList[techID].techType === "Ki") &&
+              techList[techID].transReq !== "None" && (activeCombatList[bcheck].pCombatants[index].transformation === -1 
+              || techList[activeCombatList[bcheck].pCombatants[index].transformation].name.search(techList[techID].transReq) === -1))
+            { 
+              message.delete();
+              battlePrint(pcOrNPC, ID, placement, battleEnd);
+              msg.channel.send("Required transformation not set.");
+              return;
+            }
+
+
+            if((techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
+              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki"
+              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
+              && (activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) 
+                || activeCombatList[bcheck].pCombatants[index].eTarget < 0)) {
+              activeCombatList[bcheck].pCombatants[index].eTarget = 0;
+            }
+            else if(activeCombatList[bcheck].pCombatants[index].aTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].aTarget < 0) {
+              activeCombatList[bcheck].pCombatants[index].aTarget = 0;
+            }
+
+            if((techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
+              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki"
+              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
+              && activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
+              let npchar = activeCombatList[bcheck].pCombatants[index];
+              while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
+                if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
+                else npchar.eTarget++;
+              }
+            }
+            else if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.health <= 0) {
+              let npchar = activeCombatList[bcheck].pCombatants[index];
+              while((npchar.aTarget < 0 || npchar.aTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.aTarget].battleCurrAtt.health <= 0)) {
+                if(npchar.aTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.aTarget < 0) npchar.aTarget = 0;
+                else npchar.aTarget++;
+              }
+            }
+
+            if(activeCombatList[bcheck].pCombatants[index].techCooldowns[i.values[0]] != 0) {
+              message.delete();
+              battlePrint(pcOrNPC, ID, placement, battleEnd);
+              msg.channel.send("Skill on cooldown.");
+              return;
+            }
+
+
+            if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.charge <= 0) activeCombatList[bcheck].pCombatants[index].isCharging = 0;
+
+            let costMod = Math.round((activeCombatList[bcheck].pCombatants[index].battleCurrAtt.stotal + activeCombatList[bcheck].pCombatants[index].level)/2);
+            if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.health <= techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].healthCost*costMod ||
+               activeCombatList[bcheck].pCombatants[index].battleCurrAtt.energy < techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].energyCost*costMod ||
+               activeCombatList[bcheck].pCombatants[index].battleCurrAtt.charge 
+               < Math.round(activeCombatList[bcheck].pCombatants[index].battleMaxAtt.charge * 0.2 * activeCombatList[bcheck].pCombatants[index].isCharging * techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].allowCharge)) {
+              message.delete();
+              battlePrint(pcOrNPC, ID, placement, battleEnd);
+              msg.channel.send("You don't have the resources for this technique.");
+              return;
+            }
+
+            activeCombatList[bcheck].pCombatants[index].techCooldowns[i.values[0]] = techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].coolDown;
+            let target;
+            let targetI;
+            if(techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
+              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki" 
+              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") {
+              targetI = activeCombatList[bcheck].pCombatants[index].eTarget;
+              target = activeCombatList[bcheck].NPCombatants[targetI];
+            }
+            else {
+              targetI = activeCombatList[bcheck].pCombatants[index].aTarget;
+              target = activeCombatList[bcheck].pCombatants[targetI];
+            }
+
+            let action = activeCombatList[bcheck].skill(activeCombatList[bcheck].pCombatants[index],target,techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]], activeCombatList[bcheck].pCombatants[index].isCharging);
+            action.push(index);
+            action.push(targetI);
+            activeCombatList[bcheck].actions.push(action);
+
+            collector.stop();
+            try {
+              i.update({ embeds: [embed[0]], components: [] })
+                      .then(battleTurn(bcheck));
+            } catch (error) { console.error(error); }
+          }
+        }
+      }
+      else if(i.customId === 'strike') {
+        if(team === 1) {
+          let index = 0;
+          for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
+              index = i;
+              break;
+            }
+          }
+          if(activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].eTarget < 0) {
+              activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
+          }
+          if(activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
+            let npchar = activeCombatList[bcheck].NPCombatants[index];
+            while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
+              if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
+              else npchar.eTarget++;
+            }
+          }
+
+          let action = activeCombatList[bcheck].strike(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck].pCombatants[charList[ID].eTarget]);
+          action.push(index);
+          action.push(activeCombatList[bcheck].NPCombatants[index].eTarget);
+          activeCombatList[bcheck].NPCactions.push(action);
+
+          collector.stop();
+            try {
+              i.update({ embeds: [embed[0]], components: [] })
+                      .then(battleTurn(bcheck));
+            } catch (error) { console.error(error); }
+        }
+        else {
+          let index = 0;
+          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+              index = i;
+              break;
+            }
+          }
+          if(activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].eTarget < 0) {
+              activeCombatList[bcheck].pCombatants[index].eTarget = 0;
+          }
+          if(activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
+            let npchar = activeCombatList[bcheck].pCombatants[index];
+            while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
+              if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
+              else npchar.eTarget++;
+            }
+          }
+
+          let action = activeCombatList[bcheck].strike(activeCombatList[bcheck].pCombatants[index],activeCombatList[bcheck].NPCombatants[char.eTarget]);
+          action.push(index);
+          action.push(activeCombatList[bcheck].pCombatants[index].eTarget);
+          activeCombatList[bcheck].actions.push(action);
+
+          collector.stop();
+          try {
+            i.update({ embeds: [embed[0]], components: [] })
+                    .then(battleTurn(bcheck));
+          } catch (error) { console.error(error); }
+        }
+      }
+      else if(i.customId === 'burst') {
+        if(team === 1) {
+          let index = 0;
+          for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
+              index = i;
+              break;
+            }
+          }
+          if(activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].eTarget < 0) {
+              activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
+          }
+          if(activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
+            let npchar = activeCombatList[bcheck].NPCombatants[index];
+            while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
+              if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
+              else npchar.eTarget++;
+            }
+          }
+
+          let action = activeCombatList[bcheck].burst(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck].pCombatants[char.eTarget]);
+          action.push(index);
+          action.push(activeCombatList[bcheck].NPCombatants[index].eTarget);
+          activeCombatList[bcheck].NPCactions.push(action);
+
+          collector.stop();
+          try {
+            i.update({ embeds: [embed[0]], components: [] })
+                    .then(battleTurn(bcheck));
+          } catch (error) { console.error(error); }
+        }
+        else {
+          let index = 0;
+          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+              index = i;
+              break;
+            }
+          }
+          if(activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].eTarget < 0) {
+              activeCombatList[bcheck].pCombatants[index].eTarget = 0;
+          }
+          if(activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
+            let npchar = activeCombatList[bcheck].pCombatants[index];
+            while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
+              if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
+              else npchar.eTarget++;
+            }
+          }
+
+          let action = activeCombatList[bcheck].burst(activeCombatList[bcheck].pCombatants[index],activeCombatList[bcheck].NPCombatants[charList[ID].eTarget]);
+          action.push(index);
+          action.push(activeCombatList[bcheck].pCombatants[index].eTarget);
+          activeCombatList[bcheck].actions.push(action);
+
+          collector.stop();
+          try {
+            i.update({ embeds: [embed[0]], components: [] })
+                    .then(battleTurn(bcheck));
+          } catch (error) { console.error(error); }
+        }
+      }
+      else if(i.customId === 'charge') {
+        if(team === 1) {
+          let index = 0;
+          for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
+              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
+              index = i;
+              break;
+            }
+          }
+          let action = activeCombatList[bcheck].charge(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck]);
+          action.push(index);
+          action.push(-1);
+          activeCombatList[bcheck].NPCactions.push(action);
+
+          collector.stop();
+          try {
+            i.update({ embeds: [embed[0]], components: [] })
+                    .then(battleTurn(bcheck));
+          } catch (error) { console.error(error); }
+        }
+        else {
+          let index = 0;
+          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
+              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
+              index = i;
+              break;
+            }
+          }
+          let action = activeCombatList[bcheck].charge(activeCombatList[bcheck].pCombatants[index]);
           action.push(index);
           action.push(-1);
           activeCombatList[bcheck].actions.push(action);
 
           collector.stop();
-          i.update({ embeds: [embed[0]], components: [] });
-          battleTurn(bcheck);
+          try {
+            i.update({ embeds: [embed[0]], components: [] })
+                    .then(battleTurn(bcheck));
+          } catch (error) { console.error(error); }
         }
-        else if(i.customId === 'target') {
-          let index = -1;
-          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-                if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          if(index === -1) {
-              for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-                if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-          }
-
-          message.delete();
-          battlePrint(pcOrNPC, ID, placement, battleEnd);
-          if(i.values[0].charAt(0) === "a") {
-            if(team === 0) activeCombatList[bcheck].pCombatants[index].aTarget = i.values[0].charAt(1);
-            else activeCombatList[bcheck].NPCombatants[index].aTarget = i.values[0].charAt(1);
-            msg.channel.send("Ally Target set to " + i.values[0].charAt(1) + ".");
-          }
-          else {
-            if(team === 0) activeCombatList[bcheck].pCombatants[index].eTarget = i.values[0].charAt(1);
-            else activeCombatList[bcheck].NPCombatants[index].eTarget = i.values[0].charAt(1);
-            msg.channel.send("Enemy Target set to " + i.values[0].charAt(1) + ".");
-          }
-        }
-        else if(i.customId === 'techcharge') {
-          let index = 0;
-          if(team === 0) {
-            for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-                if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            if(activeCombatList[bcheck].pCombatants[index].isCharging === 1) {
-              activeCombatList[bcheck].pCombatants[index].isCharging = 0;
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("No longer using charge to empower techniques.");
-            }
-            else {
-              activeCombatList[bcheck].pCombatants[index].isCharging = 1;
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("Now using charge to empower techniques.");
-            }
-            return;
-          }
-          else {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-                if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            if(activeCombatList[bcheck].NPCombatants[index].isCharging === 1) {
-              activeCombatList[bcheck].NPCombatants[index].isCharging = 0;
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("No longer using charge to empower techniques.");
-            }
-            else {
-              activeCombatList[bcheck].NPCombatants[index].isCharging = 1;
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("Now using charge to empower techniques.");
-            }
-            return;
-          }
-        }
-        else if(i.customId === 'techs') {
-          if(team === 1) {
-            if(techList[i.values[0]].techType === "Transform") {
-              let index = 0;
-              for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-                if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                  index = i;
-                  break;
-                }
-              }
-              let action = activeCombatList[bcheck].transform(activeCombatList[bcheck].NPCombatants[index]);
-              action.push(index);
-              action.push(-1);
-              activeCombatList[bcheck].NPCactions.push(action);
-
-              collector.stop();
-              try {
-                i.update({ embeds: [embed[0]], components: [] })
-                        .then(battleTurn(bcheck));
-              } catch (error) { console.error(error); }
-            }
-            else {
-              let index = 0;
-              for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-                if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                  index = i;
-                  break;
-                }
-              }
-
-              let techID = activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]];
-              if((techList[techID].techType === "Strike" || techList[techID].techType === "Ki") &&
-                techList[techID].transReq !== "None" && (activeCombatList[bcheck].NPCombatants[index].transformation === -1 
-                || techList[activeCombatList[bcheck].NPCombatants[index].transformation].name.search(techList[techID].transReq) === -1))
-              { 
-                message.delete();
-                battlePrint(pcOrNPC, ID, placement, battleEnd);
-                msg.channel.send("Required transformation not set.");
-                return;
-              }
-
-              if((techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-                || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki"
-                || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
-                && (activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) 
-                  || activeCombatList[bcheck].NPCombatants[index].eTarget < 0)) {
-                    activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
-              }
-              else if(activeCombatList[bcheck].NPCombatants[index].aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].aTarget < 0) {
-                  activeCombatList[bcheck].NPCombatants[index].aTarget = 0;
-              }
-
-              if((techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-                || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki"
-                || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
-                && activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-                let npchar = activeCombatList[bcheck].NPCombatants[index];
-                while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-                  if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-                  else npchar.eTarget++;
-                }
-              }
-              else if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.health <= 0) {
-                let npchar = activeCombatList[bcheck].NPCombatants[index];
-                while((npchar.aTarget < 0 || npchar.aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.aTarget].battleCurrAtt.health <= 0)) {
-                  if(npchar.aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.aTarget < 0) npchar.aTarget = 0;
-                  else npchar.aTarget++;
-                }
-              }
-
-              if(activeCombatList[bcheck].NPCombatants[index].techCooldowns[i.values[0]] != 0) {
-                message.delete();
-                battlePrint(pcOrNPC, ID, placement, battleEnd);
-                msg.channel.send("Skill on cooldown.");
-                return;
-              }
-
-
-              if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.charge <= 0) activeCombatList[bcheck].NPCombatants[index].isCharging = 0;
-
-              let costMod = Math.round((activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.stotal + activeCombatList[bcheck].NPCombatants[index].level)/2);
-              if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.health <= techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].healthCost*costMod ||
-                 activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.energy < techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].energyCost*costMod ||
-                 activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.charge 
-                 < Math.round(activeCombatList[bcheck].NPCombatants[index].battleMaxAtt.charge * 0.2 * activeCombatList[bcheck].NPCombatants[index].isCharging * techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].allowCharge)) {
-                message.delete();
-                battlePrint(pcOrNPC, ID, placement, battleEnd);
-                msg.channel.send("You don't have the resources for this technique.");
-                return;
-              }
-
-              activeCombatList[bcheck].NPCombatants[index].techCooldowns[i.values[0]] = techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].coolDown;
-              let target;
-              let targetI;
-              if(techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-                || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki" 
-                || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") {
-                targetI = activeCombatList[bcheck].NPCombatants[index].eTarget;
-                target = activeCombatList[bcheck].pCombatants[targetI];
-              }
-              else {
-                targetI = activeCombatList[bcheck].NPCombatants[index].aTarget;
-                target = activeCombatList[bcheck].pCombatants[targetI];
-              }
-
-              let action = activeCombatList[bcheck].skill(activeCombatList[bcheck].NPCombatants[index],target,techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]], activeCombatList[bcheck].NPCombatants[index].isCharging);
-              action.push(index);
-              action.push(targetI);
-              activeCombatList[bcheck].NPCactions.push(action);
-
-              collector.stop();
-              try {
-                i.update({ embeds: [embed[0]], components: [] })
-                        .then(battleTurn(bcheck));
-              } catch (error) { console.error(error); }
-            }
-          }
-          else {
-            if(techList[i.values[0]].techType === "Transform") {
-              let index = 0;
-              for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-                if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-                  index = i;
-                  break;
-                }
-              }
-              let action = activeCombatList[bcheck].transform(activeCombatList[bcheck].pCombatants[index]);
-              action.push(index);
-              action.push(-1);
-              activeCombatList[bcheck].actions.push(action);
-
-              collector.stop();
-              try {
-                i.update({ embeds: [embed[0]], components: [] })
-                        .then(battleTurn(bcheck));
-              } catch (error) { console.error(error); }
-            }
-            else {
-              let index = 0;
-              for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-                if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-                  index = i;
-                  break;
-                }
-              }
-
-              let techID = activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]];
-              if((techList[techID].techType === "Strike" || techList[techID].techType === "Ki") &&
-                techList[techID].transReq !== "None" && (activeCombatList[bcheck].pCombatants[index].transformation === -1 
-                || techList[activeCombatList[bcheck].pCombatants[index].transformation].name.search(techList[techID].transReq) === -1))
-              { 
-                message.delete();
-                battlePrint(pcOrNPC, ID, placement, battleEnd);
-                msg.channel.send("Required transformation not set.");
-                return;
-              }
-
-
-              if((techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-                || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki"
-                || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
-                && (activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) 
-                  || activeCombatList[bcheck].pCombatants[index].eTarget < 0)) {
-                activeCombatList[bcheck].pCombatants[index].eTarget = 0;
-              }
-              else if(activeCombatList[bcheck].pCombatants[index].aTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].aTarget < 0) {
-                activeCombatList[bcheck].pCombatants[index].aTarget = 0;
-              }
-
-              if((techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-                || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki"
-                || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
-                && activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-                let npchar = activeCombatList[bcheck].pCombatants[index];
-                while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-                  if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-                  else npchar.eTarget++;
-                }
-              }
-              else if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.health <= 0) {
-                let npchar = activeCombatList[bcheck].pCombatants[index];
-                while((npchar.aTarget < 0 || npchar.aTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.aTarget].battleCurrAtt.health <= 0)) {
-                  if(npchar.aTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.aTarget < 0) npchar.aTarget = 0;
-                  else npchar.aTarget++;
-                }
-              }
-
-              if(activeCombatList[bcheck].pCombatants[index].techCooldowns[i.values[0]] != 0) {
-                message.delete();
-                battlePrint(pcOrNPC, ID, placement, battleEnd);
-                msg.channel.send("Skill on cooldown.");
-                return;
-              }
-
-
-              if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.charge <= 0) activeCombatList[bcheck].pCombatants[index].isCharging = 0;
-
-              let costMod = Math.round((activeCombatList[bcheck].pCombatants[index].battleCurrAtt.stotal + activeCombatList[bcheck].pCombatants[index].level)/2);
-              if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.health <= techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].healthCost*costMod ||
-                 activeCombatList[bcheck].pCombatants[index].battleCurrAtt.energy < techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].energyCost*costMod ||
-                 activeCombatList[bcheck].pCombatants[index].battleCurrAtt.charge 
-                 < Math.round(activeCombatList[bcheck].pCombatants[index].battleMaxAtt.charge * 0.2 * activeCombatList[bcheck].pCombatants[index].isCharging * techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].allowCharge)) {
-                message.delete();
-                battlePrint(pcOrNPC, ID, placement, battleEnd);
-                msg.channel.send("You don't have the resources for this technique.");
-                return;
-              }
-
-              activeCombatList[bcheck].pCombatants[index].techCooldowns[i.values[0]] = techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].coolDown;
-              let target;
-              let targetI;
-              if(techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-                || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki" 
-                || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") {
-                targetI = activeCombatList[bcheck].pCombatants[index].eTarget;
-                target = activeCombatList[bcheck].NPCombatants[targetI];
-              }
-              else {
-                targetI = activeCombatList[bcheck].pCombatants[index].aTarget;
-                target = activeCombatList[bcheck].pCombatants[targetI];
-              }
-
-              let action = activeCombatList[bcheck].skill(activeCombatList[bcheck].pCombatants[index],target,techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]], activeCombatList[bcheck].pCombatants[index].isCharging);
-              action.push(index);
-              action.push(targetI);
-              activeCombatList[bcheck].actions.push(action);
-
-              collector.stop();
-              try {
-                i.update({ embeds: [embed[0]], components: [] })
-                        .then(battleTurn(bcheck));
-              } catch (error) { console.error(error); }
-            }
-          }
-        }
-        else if(i.customId === 'strike') {
-          if(team === 1) {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-                if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            if(activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].eTarget < 0) {
-                activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
-            }
-            if(activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-              let npchar = activeCombatList[bcheck].NPCombatants[index];
-              while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-                if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-                else npchar.eTarget++;
-              }
-            }
-
-            let action = activeCombatList[bcheck].strike(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck].pCombatants[charList[ID].eTarget]);
-            action.push(index);
-            action.push(activeCombatList[bcheck].NPCombatants[index].eTarget);
-            activeCombatList[bcheck].NPCactions.push(action);
-
-            collector.stop();
-              try {
-                i.update({ embeds: [embed[0]], components: [] })
-                        .then(battleTurn(bcheck));
-              } catch (error) { console.error(error); }
-          }
-          else {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-                if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            if(activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].eTarget < 0) {
-                activeCombatList[bcheck].pCombatants[index].eTarget = 0;
-            }
-            if(activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-              let npchar = activeCombatList[bcheck].pCombatants[index];
-              while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-                if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-                else npchar.eTarget++;
-              }
-            }
-
-            let action = activeCombatList[bcheck].strike(activeCombatList[bcheck].pCombatants[index],activeCombatList[bcheck].NPCombatants[char.eTarget]);
-            action.push(index);
-            action.push(activeCombatList[bcheck].pCombatants[index].eTarget);
-            activeCombatList[bcheck].actions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-        }
-        else if(i.customId === 'burst') {
-          if(team === 1) {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-                if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            if(activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].eTarget < 0) {
-                activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
-            }
-            if(activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-              let npchar = activeCombatList[bcheck].NPCombatants[index];
-              while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-                if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-                else npchar.eTarget++;
-              }
-            }
-
-            let action = activeCombatList[bcheck].burst(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck].pCombatants[char.eTarget]);
-            action.push(index);
-            action.push(activeCombatList[bcheck].NPCombatants[index].eTarget);
-            activeCombatList[bcheck].NPCactions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-          else {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-                if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            if(activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].eTarget < 0) {
-                activeCombatList[bcheck].pCombatants[index].eTarget = 0;
-            }
-            if(activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-              let npchar = activeCombatList[bcheck].pCombatants[index];
-              while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-                if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-                else npchar.eTarget++;
-              }
-            }
-
-            let action = activeCombatList[bcheck].burst(activeCombatList[bcheck].pCombatants[index],activeCombatList[bcheck].NPCombatants[charList[ID].eTarget]);
-            action.push(index);
-            action.push(activeCombatList[bcheck].pCombatants[index].eTarget);
-            activeCombatList[bcheck].actions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-        }
-        else if(i.customId === 'charge') {
-          if(team === 1) {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-                if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            let action = activeCombatList[bcheck].charge(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck]);
-            action.push(index);
-            action.push(-1);
-            activeCombatList[bcheck].NPCactions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-          else {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-                if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            let action = activeCombatList[bcheck].charge(activeCombatList[bcheck].pCombatants[index]);
-            action.push(index);
-            action.push(-1);
-            activeCombatList[bcheck].actions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-        }
-      });
-      collector.on('end', collected => {
-      })
+      }
+    });
+    collector.on('end', collected => { })
     });
   }
   else {
@@ -7176,12 +7422,12 @@ if(command === "forfeit") {
         else name += ', ' + techList[char.transformation].name.replace(/\_/g,' ');
     }
 
-    let currEmbed = new Discord.MessageEmbed(statusEmbed).setTitle(name);
+    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(name);
     if(char.image === '' || char.image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
     else { currEmbed.setThumbnail(char.image); }
 
     let team = -5;
-    let bcheck = getCurrentBattle(char.playerID, char.name);
+    let bcheck = Helpers.getCurrentBattle(char.playerID, char.name);
     let combatI = activeCombatList[bcheck].pCombatants.map(function(e) { return e.playerID+e.name; }).indexOf(char.playerID+char.name);
     if(combatI === -1) {
       team = 2; //NPC team
@@ -7230,7 +7476,7 @@ if(command === "forfeit") {
       //{ name: 'Attribute Total', value: char.battleCurrAtt.stotal.toLocaleString(), inline: true  },
       { name: 'Power Level', value: char.battleCurrAtt.scanPowerLevel(char.battleCurrAtt.charge,char.level).toLocaleString(undefined), inline: true },
       //{ name: '\u200b', value: '\u200b', inline: true  },
-      { name: 'Team ' + team.toLocaleString(), value: 'Slot ' + placement.toLocaleString(), inline: true  },
+      { name: 'Team ' + team.toLocaleString(), value: 'Slot ' + placement.toLocaleString(), inline: true },
 
       { name: ':red_circle: Health', value: hpStr, inline: true },
       //{ name: '\u200b', value: '\u200b', inline: true  },
@@ -7246,125 +7492,21 @@ if(command === "forfeit") {
       currEmbed.addFields(
         { name: 'Dogi', value: dogiN, inline: true  },
         { name: 'Weapon', value: weaponN, inline: true  },
-        { name: 'Fighting Style', value: char.styleName.replace(/\_/g,' '), inline: true  }
+        { name: 'Fighting Style', value: char.styleName.replace(/\_/g,' '), inline: true }
       );
     }
-
-    /*let scaleLvl = Math.round((char.battleCurrAtt.stotal + char.level)/2);
-    let str = "";
-    if(char.techniques.length >= 1) {
-      str = 'Type ' + techList[char.techniques[0]].techType + '\n';
-      currEmbed.addField(':one: ' + techList[char.techniques[0]].name.replace(/\_/g,' '), str, true);
-    }
-    else {
-      currEmbed.addField(':one: None', '\u200b', true);
-    }
-    if(char.techniques.length >= 2) {
-      str = 'Type ' + techList[char.techniques[1]].techType + '\n';
-      currEmbed.addField(':two: ' + techList[char.techniques[1]].name.replace(/\_/g,' '), str, true);
-    }
-    else {
-      currEmbed.addField(':two: None', '\u200b', true);
-    }
-    if(char.techniques.length >= 3) {
-      str = 'Type ' + techList[char.techniques[2]].techType + '\n';
-      currEmbed.addField(':three: ' + techList[char.techniques[2]].name.replace(/\_/g,' '), str, true); 
-    }
-    else {
-      currEmbed.addField(':three: None', '\u200b', true);
-    }
-    if(char.techniques.length >= 4) {
-      str = 'Type ' + techList[char.techniques[3]].techType + '\n';
-       currEmbed.addField(':four: ' + techList[char.techniques[3]].name.replace(/\_/g,' '), str, true);
-    }
-    else {
-      currEmbed.addField(':four: None', '\u200b', true);
-    }
-    if(char.techniques.length >= 5) {
-      str = 'Type ' + techList[char.techniques[4]].techType + '\n';
-       currEmbed.addField(':five: ' + techList[char.techniques[4]].name.replace(/\_/g,' '), str, true);
-    }
-    else {
-      currEmbed.addField(':five: None', '\u200b', true);
-    }
-
-    if(char.transformation !== -1) {
-      currEmbed.addField('<:t_red:832763572919992390> ' + techList[char.transformation].name.replace(/\_/g,' '), str, true);
-    }
-    else {
-      currEmbed.addField('<:t_red:832763572919992390> None', '\u200b', true);
-    }*/
 
     msg.channel.send({ embeds: [currEmbed] });
   }
 }
 
-  function findID(ID) {
-    ID = ID.replace("<","");
-    ID = ID.replace("@","");
-    ID = ID.replace(">","");
-    let index = -1;
-    index = getCharListIndex(ID);
-    if(index === null) return -1;
-    else index = users[index].getCurrentChar();
-    return index;
-  }
-
-  function getCharList(ID) {
-    ID = ID.replace("<","");
-    ID = ID.replace("@","");
-    ID = ID.replace(">","");
-    if(isNaN(ID)) return null;
-    for(let i = 0; i < users.length; i++) {
-      if(ID === users[i].userID)
-      {
-        return users[i];
-      }
-    }
-
-    if(ID !== 'NPC' && ID !== 'Random') msg.channel.send('No characters associated with that ID.')
-    return null;
-  }
-
-  function getCharListIndex(ID) {
-    ID = ID.replace("<","");
-    ID = ID.replace("@","");
-    ID = ID.replace(">","");
-    if(isNaN(ID)) return null;
-    for(let i = 0; i < users.length; i++) {
-      if(ID === users[i].userID)
-      {
-        return i;
-      }
-    }
-
-    if(ID !== 'NPC' && ID !== 'Random') msg.channel.send('No characters associated with that ID.')
-    return null;
-  }
-
-  function findNPCID(ID) {
-    let index = -1;
-    for(let i = 0; i < npcList.length; i++) {
-      if(ID.toLowerCase() === npcList[i].name.toLowerCase())
-      {
-        index = i;
-        break;
-      }
-    }
-    if(index === -1) {
-      if(ID !== 'NPC' && ID !== 'Random') msg.channel.send('No NPC associated with that name.')
-    }
-    return index;
-  }
-
-})
 
 function startTraining(char, player) {
   if(char.trainingType === 'xp') {
     setInterval(function() {
       if(char.training > 0) {
         char.training--;
-        let xp = calcXPTrainingGain(char, player);
+        let xp = Helpers.calcXPTrainingGain(char, player);
         if(player.trainingLog.length < 2000) {
           player.trainingLog += '\n**' + char.name.replace(/\_/g,' ') + '** has gained ' + xp.toLocaleString(undefined) + ' exp.'
           player.trainingLog += char.addEXP(xp);
@@ -7383,7 +7525,7 @@ function startTraining(char, player) {
     setInterval(function() {
       if(char.training > 0) {
         char.training--;
-        let xp = calcTXPTrainingGain(char, player);
+        let xp = Helpers.calcTXPTrainingGain(char, player);
         if(player.trainingLog.length < 2000) {
           player.trainingLog += '\n**' + char.name.replace(/\_/g,' ') + '** has gained ' + xp.toLocaleString(undefined) + ' exp.'
           player.trainingLog += char.addEXP(xp);
@@ -7402,7 +7544,7 @@ function startTraining(char, player) {
     setInterval(function() {
       if(char.training > 0) {
         char.training--;
-        let tp = calcTPTrainingGain(char, player);
+        let tp = Helpers.calcTPTrainingGain(char, player);
         if(player.trainingLog.length < 2000) {
           player.trainingLog += '\n**' + char.name.replace(/\_/g,' ') + '** has gained ' + tp.toLocaleString(undefined) + ' technique points.'
         }
@@ -7417,75 +7559,3 @@ function startTraining(char, player) {
     //1000 miliseconds * 60 seconds * 60 minutes => 1 hour 
   }
 }
-
-function calcNPCTrainingGain(char) {
-  let highest = char.attributes.stotal*statEXP+char.level*levelEXP;
-  let xp = 1+Math.round(trainingModifier * highest / 4);
-
-  return Math.floor(xp);
-}
-
-function calcXPTrainingGain(char, user) {
-  let highest = 0;
-  for(let i = 0; i < user.charIDs.length; i++) {
-    let value = charList[user.charIDs[i]].attributes.stotal*statEXP+charList[user.charIDs[i]].level*levelEXP;
-    if(value >= highest) {
-      highest = value;
-    }
-  }
-  let xp = 1+Math.round(trainingModifier * highest);
-  if(char.level >= trainingSoftCap) {
-    xp = 1 + Math.round(char.level * trainingModifier)
-  }
-  if(user.dojo !== null && char.styleName === user.dojo.guildStyle) {
-    xp *= 1.25;
-  }
-  else if(user.dojo !== null) {
-    xp *= 1.15;
-  }
-
-  return Math.floor(xp);
-}
-
-function calcTXPTrainingGain(char, user) {
-  let highest = 0;
-  for(let i = 0; i < user.charIDs.length; i++) {
-    let value = charList[user.charIDs[i]].attributes.stotal*statEXP+charList[user.charIDs[i]].level*levelEXP;
-    if(value >= highest) {
-      highest = value;
-    }
-  }
-  let xp = 1+Math.round(trainingModifier * highest / 1.5);
-  if(char.level >= trainingSoftCap) {
-    xp = 1 + Math.round(char.level * trainingModifier / 1.5)
-  }
-  if(user.dojo !== null && char.styleName === user.dojo.guildStyle) {
-    xp *= 1.25;
-  }
-  else if(user.dojo !== null) {
-    xp *= 1.15;
-  }
-
-  return Math.floor(xp);
-}
-
-function calcTPTrainingGain(char, user) {
-  let highest = 30;
-  for(let i = 0; i < user.charIDs.length; i++) {
-    if(charList[user.charIDs[i]].fightingStyle == null) continue;
-    let value = charList[user.charIDs[i]].fightingStyle.getTotalChange();
-    if(value >= highest) {
-      highest = value;
-    }
-  }
-  let tp = 1+Math.round(trainingModifier * highest / 1.5);
-  if(user.dojo !== null && char.styleName === user.dojo.guildStyle) {
-    tp *= 1.25;
-  }
-  else if(user.dojo !== null) {
-    tp *= 1.15;
-  }
-
-  return Math.floor(tp);
-}
-

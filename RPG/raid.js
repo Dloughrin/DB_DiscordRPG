@@ -40,13 +40,14 @@ class Raid {
 
 	static raidReward(raidID, char, user) { 
 		let str = ""
+		// Sage, flat stats + stat caps
 		if(raidID === 1) {
 				if(parseInt(char.potentialUnlocked) === 0) {
 					let z = char.unlockPotential();
 					char.statusUpdate(0);
 					if(z === 1) str = char.name + " has unlocked their potential! Boost to all attributes, and increased maximum value for fighting styles!";
 				}
-		}
+		} // Kaioshin, race + stat caps
 		else if(raidID === 2) {
 			if(char.potentialUnleashed === 0) {
 				let z = char.unleashPotential(1);
@@ -56,22 +57,28 @@ class Raid {
 					str += "\n**Additionally, you can now make characters with the Core Person race.**"
 				}
 			}
+		} // Krillin, inv slots
+		else if(raidID === 3) {
+			if(user.itemInventory.inv1 === 0) {
+				user.itemInventory.inv1 = 1;
+				user.itemInventory.maxSize += 5;
+			}
 		}
 		else { }
 
 		return str;
 	}
 
+	//Item Inventory size increase #1
 	static krillinTrial(techList, char, ID, Krillin) { 
-  		let level = Math.max(400,char.level);
+  	let level = Math.max(400,char.level);
 		let kClone = Krillin.clone();
 		kClone.level = level;
-		kClone = Raid.scaleStats(kClone,Math.max(350,char.attributes.stotal*0.5));
+		kClone = Raid.scaleStats(kClone,Math.max(350,200+char.attributes.stotal*0.75));
 		kClone.fightingStyle.scaleStats(Math.min(100,char.fightingStyle.getTotalChange())/kClone.fightingStyle.getTotalChange());
 		kClone.statusUpdate(0);
 		kClone.raidBoss();
 
-		//[char,gohanClone]
 		let trial = new Battle([char],[kClone],ID,techList);
 		trial.raid = 3;
 		trial.expMod = 2;
@@ -267,6 +274,7 @@ class Raid {
 		return trial;
 	}
 
+	// Chance of unlocking Legendary SS, only 1 limited race per account
 	broly(npcList, techList, party) { 
 		let attr = new Attributes(65,45,60,55,85,100);
   		let broly = new Character("Broly",new Races("Legendary_Super_Saiyan"),attr,"Random");
@@ -283,14 +291,13 @@ class Raid {
 
 	}
 
+	// Chance of unlocking Bio Android, only 1 limited race per account
 	cell() { }
 
-	cellJR() { }
-
+	// Chance of unlocking Legendary Majin, only 1 limited race per account
 	superBuu() { }
 
-	gokuBlack() { }
-
+	// Chance of unlocking Legendary Core Person, only 1 limited race per account
 	zamasu() { }
 }
 

@@ -5,7 +5,7 @@ class User {
 		this.currentChar = 0;
 		this.tags = new Array();
 		this.over = -1;
-    	this.itemInventory = inv;
+    this.itemInventory = inv;
 		this.zeni = 15000;
 
 		this.shopping = 0;

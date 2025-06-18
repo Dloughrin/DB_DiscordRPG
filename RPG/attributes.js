@@ -10,9 +10,9 @@ class Attributes {
 		this.eng = e;
 		this.sol = so;
 		this.foc = f;
-	    this.stotal = s + d + c + e + so + f;
-	      
-	    this.chargeBonus = 1;
+    this.stotal = s + d + c + e + so + f;
+      
+    this.chargeBonus = 1;
 
 		this.health = 5;
 		this.energy = 0;
@@ -23,8 +23,8 @@ class Attributes {
 		this.hit = 10;
 		this.dodge = 1;
 		this.speed = 1;
-	    this.critRate = 5;
-	    this.critDamage = 1.25;
+    this.critRate = 5;
+    this.critDamage = 1.25;
 		this.blockRate = 1;
 		this.blockPower = 2;
 
@@ -33,13 +33,13 @@ class Attributes {
 
 		this.magicPower = 0;
 		this.magicDefense = 0;
-      
-	    this.physicalAttack = 1;
-	    this.energyAttack = 1;
+    
+    this.physicalAttack = 1;
+    this.energyAttack = 1;
 
-	    this.buffs = new Array();
-	   	this.buffDurations = new Array(); 
-	    this.btotal = new AttributeBonus('AttTotal',"Total");
+    this.buffs = new Array();
+   	this.buffDurations = new Array(); 
+    this.btotal = new AttributeBonus('AttTotal',"Total");
 
 		this.calculate(1);
 	}
@@ -50,11 +50,9 @@ class Attributes {
 
 		this.hit = Math.round((0.5*level + 10 +(this.dex*0.25)+(this.foc)+0.05*(this.str+this.sol))*this.btotal.hit);
 		this.dodge = Math.round(((0.4*level + 5 + (this.dex*0.75)+(this.foc*0.3)))*this.btotal.dodge);
-	    this.speed = Math.round((10 + (this.dex+(0.75*this.foc)+10)*level)*this.btotal.speed);
-	    //this.critRate = Math.min(80,Math.round((5 + (this.dex/10 + this.foc/15))*(this.btotal.critRate)));
-	    this.critRate = Math.round((5 + (3.5*Math.pow(this.dex,0.33) + 3*Math.pow(this.foc,0.25)))*(this.btotal.critRate));
-	    this.critDamage = (1.2 + (this.str * (1/10) + this.dex * (3/40) + this.foc * (5/20) + this.sol * (1/10))/100)*this.btotal.critDamage;
-		//this.blockRate = Math.min(90,((15 + (this.dex/25 + this.foc/25 + this.str/15))*this.btotal.blockRate));
+    this.speed = Math.round((10 + (this.dex+(0.75*this.foc)+10)*level)*this.btotal.speed);
+    this.critRate = Math.round((5 + (3.5*Math.pow(this.dex,0.33) + 3*Math.pow(this.foc,0.25)))*(this.btotal.critRate));
+    this.critDamage = (1.2 + (this.str * (1/10) + this.dex * (3/40) + this.foc * (5/20) + this.sol * (1/10))/100)*this.btotal.critDamage;
 		this.blockRate = Math.min(90,((5 + (1.15*Math.pow(this.dex,0.33) + Math.pow(this.foc,0.33) + 1.2*Math.pow(this.str,0.5)))*this.btotal.blockRate));
 		this.blockPower = Math.min(1200,Math.round(100 + ((this.con*1.25)+(this.str*0.75)+(this.sol*0.75))*this.btotal.blockPower));
 		
@@ -65,25 +63,25 @@ class Attributes {
 		this.magicPower = Math.round(((0 + (this.sol+(this.foc*2)+(this.eng/2)+1)*level) / 10)*this.btotal.magicPower);
 		this.magicDefense = Math.round(((50 + this.sol*1.5 + this.eng) / 3)*this.btotal.magicDefense);
         
-	    this.physicalAttack = 30 + Math.round(((3 + this.str*2 + this.dex*0.5) * level / 2));
-	    this.energyAttack = 25 + Math.round(((1 + this.sol*2 + this.foc*0.4) * level / 2));
+    this.physicalAttack = 30 + Math.round(((3 + this.str*2 + this.dex*0.5) * level / 2));
+    this.energyAttack = 25 + Math.round(((1 + this.sol*2 + this.foc*0.4) * level / 2));
 
-	    let physBonus = Math.floor(this.physicalAttack*0.3);
-	    let energyBonus = Math.floor(this.energyAttack*0.3);
-	    this.physicalAttack = Math.floor(((this.physicalAttack*0.8) + energyBonus)*this.btotal.physicalAttack);
-	    this.energyAttack = Math.floor(((this.energyAttack*0.8) + physBonus)*this.btotal.energyAttack);
+    let physBonus = Math.floor(this.physicalAttack*0.3);
+    let energyBonus = Math.floor(this.energyAttack*0.3);
+    this.physicalAttack = Math.floor(((this.physicalAttack*0.8) + energyBonus)*this.btotal.physicalAttack);
+    this.energyAttack = Math.floor(((this.energyAttack*0.8) + physBonus)*this.btotal.energyAttack);
 	}
 
 	calculate(level) {
 		this.getBuffTotal();
-    	this.setChargeBonus();
+  	this.setChargeBonus();
 		this.str = Math.round(this.str*this.btotal.bstr);
 		this.dex = Math.round(this.dex*this.btotal.bdex);
 		this.con = Math.round(this.con*this.btotal.bcon);
 		this.eng = Math.round(this.eng*this.btotal.beng);
 		this.sol = Math.round(this.sol*this.btotal.bsol);
 		this.foc = Math.round(this.foc*this.btotal.bfoc);
-    	this.stotal = this.str + this.dex + this.con + this.eng + this.sol + this.foc;
+  	this.stotal = this.str + this.dex + this.con + this.eng + this.sol + this.foc;
 
 		this.health = Math.round((50 + (this.con*1.25+2)*level*10)*this.btotal.health);
 		this.energy = Math.round((10 + (this.eng*1.1+1)*level*10)*this.btotal.energy);
@@ -93,8 +91,8 @@ class Attributes {
 
 	battleCalc(level) {
 		this.getBuffTotal();
-	    this.setChargeBonus();
-	    this.calcAdvStats(level);
+    this.setChargeBonus();
+    this.calcAdvStats(level);
 	}
 
 	getBuffTotal() {

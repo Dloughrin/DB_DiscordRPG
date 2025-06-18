@@ -122,53 +122,12 @@ class Loader {
 		return charList;
 	}
 
-	/*characterLoader(users, itemList) {
-		let charList = new Array();
-		let contents = fs.readFileSync(this.characterPath, 'utf8');
-		if(contents === null) return charList;
-		let inputLines = contents.trim().split('\n');
-		for(let i = 0; i < inputLines.length; i++) {
-			const args = inputLines[i].trim().split(' ');
-			let ID = -1;
-			for(let b = 0; b < users.length; b++) {
-				if(users[b].userID === args[0]) {
-					ID = b;
-					break;
-				}
-			}
-
-			let attr = new Attributes(Number(args[6]),Number(args[7]),Number(args[8]),Number(args[9]),Number(args[10]),Number(args[11]));
-	      	let c = new Character(args[1],new Races(args[2]),attr,args[0]);
-	      	c.reAddEXP(Number(args[3]));
-	      	c.statPoints = Number(args[4]);
-	      	c.techniquePoints = Number(args[5]);
-	      	c.deathCount = Number(args[12]);
-	      	let index = itemList.map(function(e) { return e.uid; }).indexOf(args[13]);
-			    if(index !== -1) c.equipItem("Dogi",itemList[index]);
-			    index = itemList.map(function(e) { return e.uid; }).indexOf(args[14]);
-			    if(index !== -1) c.equipItem("Weapon",itemList[index]);
-	      	c.image = String(args[15]);
-	      	c.potentialUnlocked = args[16];
-			c.unleashPotential(args[17]);
-			//console.log(c.race)
-	      	//c.race.potentialUnlocked(c.potentialUnlocked);
-	      	//c.race.potentialUnleashed(c.potentialUnleashed);
-
-	      	for(let j = 18; j < args.length; j++) {
-	      		if(j < args.length-1) c.addTechnique(Number(args[j]),users[ID]);
-	      		else c.setTransformation(Number(args[j]),users[ID]);
-	      	}
-
-	      	c.statusUpdate(0);
-			charList.push(c);
-		}
-		return charList;
-	}*/
-
 	characterSaver(charList) {
 		let set = new Array();
 		//let stream = fs.createWriteStream(this.characterPath);
 		for(let i = 0; i < charList.length; i++) {
+			if(charList[i] == null) continue;
+
 			let duid = -1;
 			if(charList[i].dogi !== null) duid = charList[i].dogi.uid;
 			let wuid = -1;
@@ -218,31 +177,6 @@ class Loader {
 		reader.writeFile(file,this.dataPath);
 		//stream.end();
 	}
-
-	/*characterSaver(charList,charListID) {
-		let str;
-		let stream = fs.createWriteStream(this.characterPath);
-		for(let i = 0; i < charListID.length; i++) {
-			str = charListID[i] + ' ' + charList[i].name + ' ' + charList[i].race.raceName + ' ';
-			str += charList[i].totalexp + ' ' + charList[i].statPoints + ' ' + charList[i].techniquePoints + ' ' + charList[i].attributes.str;
-			str += ' ' + charList[i].attributes.dex + ' ' + charList[i].attributes.con + ' ';
-			str += charList[i].attributes.eng + ' ' + charList[i].attributes.sol + ' ' + charList[i].attributes.foc + ' ';
-			let duid = -1;
-			if(charList[i].dogi !== null) duid = charList[i].dogi.uid;
-			let wuid = -1;
-			if(charList[i].weapon !== null) wuid = charList[i].weapon.uid;
-			str += charList[i].deathCount + ' ' + duid + ' ' + wuid + ' ' + String(charList[i].image) + ' ' + charList[i].potentialUnlocked + ' ' + charList[i].potentialUnleashed;
-
-			for(let j = 0; j < charList[i].techniques.length; j++) {
-				str += ' ' + charList[i].techniques[j];
-			}
-			str += ' ' + charList[i].transformation;
-			str += '\n'
-
-			stream.write(str);
-		}
-		stream.end();
-	}*/
 
 	userSaver(userList) {
 		let set = new Array();
@@ -310,36 +244,6 @@ class Loader {
 ///////////////////////////
 
 	npcLoader(itemList) {
-		/*
-		let charList = new Array();
-		let contents = fs.readFileSync(this.npcPath, 'utf8');
-		if(contents === null) return charList;
-		let inputLines = contents.trim().split('\n');
-		for(let i = 0; i < inputLines.length; i++) {
-			let args = inputLines[i].trim().split(' ');
-			let attr = new Attributes(Number(args[5]),Number(args[6]),Number(args[7]),Number(args[8]),Number(args[9]),Number(args[10]));
-			let c = new Character(args[0],new Races(args[1]),attr,'NPC');
-			c.reAddEXP(Number(args[2]));
-			c.statPoints = Number(args[3]);
-			c.techniquePoints = Number(args[4]);
-			c.deathCount = Number(args[11]);
-			let index = itemList.map(function(e) { return e.uid; }).indexOf(args[12]);
-		    if(index !== -1) c.equipItem("Dogi",itemList[index]);
-		    index = itemList.map(function(e) { return e.uid; }).indexOf(args[13]);
-		    if(index !== -1) c.equipItem("Weapon",itemList[index]);
-			c.image = String(args[14]);
-			c.setPersonality(args[15]);
-
-			for(let j = 16; j < args.length; j++) {
-				if(j !== args.length-1) c.addTechnique(Number(args[j]),'NPC');
-				else c.setTransformation(Number(args[j]),'NPC');
-			}
-			if(c.attributes.stotal > 600) c.unlockPotential();
-			if(c.attributes.stotal > 900) c.unleashPotential(1);
-			charList.push(c);
-		}
-		return charList;
-		*/
 		const file = reader.readFile(this.dataPath)
 		let data = reader.utils.sheet_to_json(file.Sheets["NPCs"]);
 
@@ -376,6 +280,8 @@ class Loader {
 	npcSaver(charList) {
 		let set = new Array();
 		for(let i = 0; i < charList.length; i++) {
+			if(charList[i] == null) continue;
+
 			let duid = -1;
 			if(charList[i].dogi !== null) duid = charList[i].dogi.uid;
 			let wuid = -1;
@@ -473,12 +379,16 @@ class Loader {
 	styleSaver(npcList, charList) {
 		let set = new Array();
 		for(let i = 0; i < npcList.length; i++) {
+			if(npcList[i] == null) continue;
+
 			npcList[i].fightingStyle.UI = npcList[i].playerID+npcList[i].name;
 			let info = npcList[i].fightingStyle;
 
 			set.push(info);
 		}
 		for(let i = 0; i < charList.length; i++) {
+			if(charList[i] == null) continue;
+
 			charList[i].fightingStyle.UI = charList[i].playerID+charList[i].name;
 			let info = charList[i].fightingStyle;
 
@@ -655,6 +565,12 @@ class Loader {
 			let info = {
 				"Inv ID": invList[i].uid,
 				"Owner ID": invList[i].userID,
+				"Inv 1" : invList[i].inv1,
+				"Inv 2" : invList[i].inv2,
+				"Inv 3" : invList[i].inv3,
+				"Inv 4" : invList[i].inv4,
+				"Inv 5" : invList[i].inv5,
+				"Inv 6" : invList[i].inv6,
 				"Item Count": invList[i].items.length
 			}
 
@@ -679,6 +595,15 @@ class Loader {
 		let invList = new Array();
 		for(let i = 0; i < data.length; i++) { 
 			let inv = new Inventory(data[i]["Inv ID"],data[i]["Owner ID"]);
+
+			inv.inv1 = data[i]["Inv 1"];
+			inv.inv2 = data[i]["Inv 2"];
+			inv.inv3 = data[i]["Inv 3"];
+			inv.inv4 = data[i]["Inv 4"];
+			inv.inv5 = data[i]["Inv 5"];
+			inv.inv6 = data[i]["Inv 6"];
+
+			inv.maxSize = 20 + 5 * (inv.inv1 + inv.inv2 + inv.inv3 + inv.inv4 + inv.inv5 + inv.inv6);
 
 			let itemlength = data[i]["Item Count"];
 			for(let j = 0; j < itemlength; j++) {

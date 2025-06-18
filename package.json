@@ -6,7 +6,7 @@
   "author": "Dustin Loughrin",
   "license": "ISC",
   "dependencies": {
-    "discord.js": "^13.8.0",
+    "discord.js": "^14.14.1",
     "xlsx": "^0.18.5"
   }
 }

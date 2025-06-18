@@ -7,6 +7,15 @@ class Inventory {
 		this.maxSize = 20;
 		this.uid = uid;
 		this.userID = userID;
+
+		//Inventory unlocks
+		this.inv1 = 0;
+		this.inv2 = 0;
+		this.inv3 = 0;
+		this.inv4 = 0;
+		this.inv5 = 0;
+		this.inv6 = 0;
+
 		this.items = new Array();
 	}
 

@@ -1,5 +1,6 @@
 const { token, prefix, devID } = require('./helpers/variables')
 const { Helpers } = require('./helpers/helpers')
+const { BattleMaster } = require('./helpers/battleMaster')
 
 /* 
   Credits
@@ -82,6 +83,8 @@ let dojoList = new Array();
 
 let activeCombatList = new Array();
 
+let battleMaster;
+
 // ---------------------------------------
 
 const args = process.argv.slice(2);
@@ -124,6 +127,23 @@ bot.on('ready', () => {
       }
     }
   }
+
+  battleMaster = new BattleMaster({
+    charList,
+    activeCombatList,
+    techList,
+    statusEmbed,
+    messageEmbed,
+    users,
+    npcList,
+    itemList,
+    invList,
+    loader,
+    printItem,
+    statEXP,
+    levelEXP,
+    npcEXPMulti
+  });
 
   console.log("Bot is ready.");
 });
@@ -2139,7 +2159,7 @@ if(command === 'currentbattle' || command === 'viewbattle') {
   }
 
   if(bcheck >= 0) {
-    printBattleList(activeCombatList[bcheck],1);
+    battleMaster.printBattleList(activeCombatList[bcheck],1, msg);
   }
   else {
     let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
@@ -2189,7 +2209,7 @@ if(command === "suppress") {
         activeCombatList[bcheck].pCombatants[index].removeBuff(activeCombatList[bcheck].pCombatants[index].scaled);
         activeCombatList[bcheck].pCombatants[index].scaled = -1;
         msg.channel.send("<@" + msg.author.id + "> No longer lowering stats.");
-        printBattleList(activeCombatList[bcheck],1);
+        battleMaster.printBattleList(activeCombatList[bcheck],1, msg);
         return;
       }
 
@@ -2221,7 +2241,7 @@ if(command === "suppress") {
         activeCombatList[bcheck].NPCombatants[index].removeBuff(activeCombatList[bcheck].NPCombatants[index].scaled);
         activeCombatList[bcheck].NPCombatants[index].scaled = -1;
         msg.channel.send("<@" + msg.author.id + "> No longer lowering stats.");
-        printBattleList(activeCombatList[bcheck],1);
+        battleMaster.printBattleList(activeCombatList[bcheck],1, msg);
         return;
       }
 
@@ -2315,7 +2335,7 @@ if(command === "suppress") {
     return;
   }
 
-  printBattleList(activeCombatList[bcheck],1);
+  battleMaster.printBattleList(activeCombatList[bcheck],1, msg);
 }
 
 if(command === "battle") {
@@ -2654,7 +2674,7 @@ if(command === "battle") {
   newbattle.deathChance = safe;
   if(args[0] === "challenge") newbattle.itemBox = "Epic";
   activeCombatList.push(newbattle);
-  printBattleList(activeCombatList[activeCombatList.length-1]);
+  battleMaster.printBattleList(activeCombatList[activeCombatList.length-1], msg);
 }
 
 if(command === "spar") {
@@ -2760,7 +2780,7 @@ if(command === "npcspar") {
   let newbattle = new Battle(new Array(pc),new Array(npc),activeCombatList.length, techList);
   newbattle.expMod = 0.8;
   activeCombatList.push(newbattle);
-  printBattleList(activeCombatList[activeCombatList.length-1]);
+  battleMaster.printBattleList(activeCombatList[activeCombatList.length-1], msg);
 }
 
 if(command === "trial") {
@@ -2813,19 +2833,19 @@ if(command === "trial") {
   if(args[0] === "sage") {
     let newbattle = Raid.sageTrial(techList, charList[pci],activeCombatList.length);
     activeCombatList.push(newbattle);
-    printBattleList(activeCombatList[activeCombatList.length-1]);
+    battleMaster.printBattleList(activeCombatList[activeCombatList.length-1], msg);
   }
   else if(args[0] === "kai") {
     let npcI = Helpers.findNPCID("Gohan", npcList);
     let newbattle = Raid.kaioshinTrial(techList, charList[pci],activeCombatList.length, npcList[npcI]);
     activeCombatList.push(newbattle);
-    printBattleList(activeCombatList[activeCombatList.length-1]);
+    battleMaster.printBattleList(activeCombatList[activeCombatList.length-1], msg);
   }
   else if(args[0] === "krillin") {
     let npcI = Helpers.findNPCID("Krillin", npcList);
     let newbattle = Raid.krillinTrial(techList, charList[pci],activeCombatList.length, npcList[npcI]);
     activeCombatList.push(newbattle);
-    printBattleList(activeCombatList[activeCombatList.length-1]);
+    battleMaster.printBattleList(activeCombatList[activeCombatList.length-1], msg);
   }
   else {
     let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Error');
@@ -2839,7 +2859,7 @@ if(command === "forfeit") {
   let pci = Helpers.findID(msg.author.id, charList, users);
   let battleID = Helpers.getCurrentBattle(msg.author.id, charList[pci].name);
   if(battleID !== -1) {
-    printBattleList(activeCombatList[battleID],1);
+    battleMaster.printBattleList(activeCombatList[battleID],1, msg);
 
     for(let i = 0; i < activeCombatList[battleID].pCombatants.length; i++) {
       let chance = Math.round(Math.random() * 99 + 1);
@@ -2847,7 +2867,7 @@ if(command === "forfeit") {
         let user = Helpers.getCharList(activeCombatList[battleID].pCombatants[i].playerID, users);
         let zeni = (activeCombatList[battleID].pCombatants[i].level+activeCombatList[battleID].pCombatants[i].attributes.stotal)*20 + activeCombatList[battleID].zeniRisk;
         user.zeni = user.zeni - zeni;
-        battleMessage(activeCombatList[battleID].pCombatants[i].name + " has died. They will be ressurected, but must pay " + zeni + " zeni. No Technique Points will be retained.");
+        battleMaster.battleMessage(msg.channel, activeCombatList[battleID].pCombatants[i].name + " has died. They will be ressurected, but must pay " + zeni + " zeni. No Technique Points will be retained.");
         let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(activeCombatList[battleID].pCombatants[i].playerID+activeCombatList[battleID].pCombatants[i].name);
         charList[z].rebirth();
         if(user.zeni < 0) user.zeni = 0;
@@ -2860,7 +2880,7 @@ if(command === "forfeit") {
           let user = Helpers.getCharList(activeCombatList[battleID].NPCombatants[i].playerID, users);
           let zeni = (activeCombatList[battleID].NPCombatants[i].level+activeCombatList[battleID].NPCombatants[i].attributes.stotal)*20 + activeCombatList[battleID].zeniRisk;
           user.zeni = user.zeni - zeni;
-          battleMessage(activeCombatList[battleID].NPCombatants[i].name + " has died. They will be ressurected, but must pay " + zeni + " zeni. No Technique Points will be retained.");
+          battleMaster.battleMessage(msg.channel, activeCombatList[battleID].NPCombatants[i].name + " has died. They will be ressurected, but must pay " + zeni + " zeni. No Technique Points will be retained.");
           let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(activeCombatList[battleID].NPCombatants[i].playerID+activeCombatList[battleID].NPCombatants[i].name);
           charList[z].rebirth();
           if(user.zeni < 0) user.zeni = 0;
@@ -4508,7 +4528,7 @@ if(command === "forfeit") {
               loader.userSaver(users);
             }
             activeCombatList.push(newbattle);
-            printBattleList(activeCombatList[activeCombatList.length-1]);
+            battleMaster.printBattleList(activeCombatList[activeCombatList.length-1], msg);
             i.update({ embeds: [currEmbed], components: [] });
             collector.stop();
           }
@@ -6058,378 +6078,6 @@ if(command === "forfeit") {
     return [count,three];
   }
 
-  function battleTurn(battleID) {
-    if(activeCombatList[battleID].allActed() === 1) {
-      activeCombatList[battleID].executeActions();      
-      battleMessage("Turn " + activeCombatList[battleID].turn + " end.")
-      let playersDead = activeCombatList[battleID].teamDead(activeCombatList[battleID].pCombatants);
-      let npcsDead = activeCombatList[battleID].teamDead(activeCombatList[battleID].NPCombatants);
-      let playerteamoutput = "";
-      for(let i = 0; i < activeCombatList[battleID].NPCactions.length; i++) {
-        let pcOrNPC = -1;
-        let z = activeCombatList[battleID].NPCombatants[activeCombatList[battleID].NPCactions[i][2]];
-        if(activeCombatList[battleID].NPCombatants[activeCombatList[battleID].NPCactions[i][2]].playerID !== 'NPC' && activeCombatList[battleID].NPCombatants[activeCombatList[battleID].NPCactions[i][2]].playerID !== 'Random') {
-          pcOrNPC = 1;
-          z = charList.map(function(e) 
-            { return e.playerID+e.name; }
-            ).indexOf(activeCombatList[battleID].NPCombatants[activeCombatList[battleID].NPCactions[i][2]].playerID+activeCombatList[battleID].NPCombatants[activeCombatList[battleID].NPCactions[i][2]].name);
-        }
-        if(playersDead === 1 || npcsDead === 1) {
-          battlePrint(pcOrNPC,z,activeCombatList[battleID].NPCactions[i][2],1);
-        }
-        else battlePrint(pcOrNPC,z,activeCombatList[battleID].NPCactions[i][2]);
-        if(activeCombatList[battleID].NPCombatants[activeCombatList[battleID].NPCactions[i][2]].battleCurrAtt.health > 0) playerteamoutput += activeCombatList[battleID].NPCactions[i][1] + '\n\n';
-      }
-      if(playerteamoutput !== "") battleMessage(playerteamoutput);
-      activeCombatList[battleID].NPCactions = new Array();
-      let npcteamoutput = "";
-      for(let i = 0; i < activeCombatList[battleID].actions.length; i++) {
-        //let z = charList.indexOf(activeCombatList[battleID].pCombatants[activeCombatList[battleID].actions[i][2]]);
-        let pcOrNPC = -1;
-        let z = activeCombatList[battleID].pCombatants[activeCombatList[battleID].actions[i][2]];
-        if(activeCombatList[battleID].pCombatants[activeCombatList[battleID].actions[i][2]].playerID !== 'NPC' && activeCombatList[battleID].pCombatants[activeCombatList[battleID].actions[i][2]].playerID !== 'Random') {
-          pcOrNPC = 1;
-          z = charList.map(function(e) 
-            { return e.playerID+e.name; }
-            ).indexOf(activeCombatList[battleID].pCombatants[activeCombatList[battleID].actions[i][2]].playerID+activeCombatList[battleID].pCombatants[activeCombatList[battleID].actions[i][2]].name);
-        }
-        if(playersDead === 1 || npcsDead === 1) battlePrint(pcOrNPC,z,activeCombatList[battleID].actions[i][2], 1);
-        else battlePrint(pcOrNPC,z,activeCombatList[battleID].actions[i][2]);
-        npcteamoutput += activeCombatList[battleID].actions[i][1] + '\n\n';
-      }
-      if(npcteamoutput !== "") battleMessage(npcteamoutput);
-      activeCombatList[battleID].actions = new Array();
-
-      if(playersDead === 1) {
-        battleMessage("All challengers have been defeated.");
-        let exp = 0;
-        let pplv = 0;
-        let zeni = 0;
-        for(let i = 0; i < activeCombatList[battleID].pCombatants.length; i++) {
-          let chance = Math.round(Math.random() * 99 + 1);
-          if(activeCombatList[battleID].deathChance != 0 && chance < activeCombatList[battleID].deathChance) {
-            let user = Helpers.getCharList(activeCombatList[battleID].pCombatants[i].playerID, users);
-            let zeni = (activeCombatList[battleID].pCombatants[i].level+activeCombatList[battleID].pCombatants[i].attributes.stotal)*15;
-            user.zeni = user.zeni - zeni;
-            let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(activeCombatList[battleID].pCombatants[i].playerID+activeCombatList[battleID].pCombatants[i].name);
-            charList[z].rebirth();
-            battleMessage(activeCombatList[battleID].pCombatants[i].name + " has died. They will be ressurected, but must pay " + zeni.toLocaleString(undefined)  + " zeni. No Technique Points will be retained.");
-            if(user.zeni < 0) user.zeni = 0;
-            activeCombatList[battleID].pCombatants[i].earnedEXP = 0;
-          }
-          else {
-            zeni += 1000 + Math.round(Math.min((activeCombatList[battleID].pCombatants[i].battleMaxAtt.stotal+1),750)*activeCombatList[battleID].pCombatants[i].level/10);
-            exp += (1+activeCombatList[battleID].pCombatants[i].battleMaxAtt.stotal)*statEXP;
-            exp += (1+activeCombatList[battleID].pCombatants[i].level)*levelEXP;
-            pplv += activeCombatList[battleID].pCombatants[i].level;
-
-            let str = "";
-            let texp;
-            if(activeCombatList[battleID].pCombatants[i].party === null)  {
-              texp = Math.max(1,Math.round((activeCombatList[battleID].expMod*exp*0.04+1)));
-              //str += texp.toLocaleString(undefined)
-              str += activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + " gains " + texp.toLocaleString(undefined) + " EXP!";
-              str += activeCombatList[battleID].pCombatants[i].addEXP(texp);
-              activeCombatList[battleID].pCombatants[i].earnedEXP = texp;
-            }
-            else {
-              texp = Math.max(1,Math.round((activeCombatList[battleID].expMod*exp*0.04+1)*activeCombatList[battleID].pCombatants[i].party.expMod));
-              str += activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + " gains " + texp.toLocaleString(undefined) + " EXP!";
-              str += activeCombatList[battleID].pCombatants[i].addEXP(texp);
-              activeCombatList[battleID].pCombatants[i].earnedEXP = texp;
-
-              if(activeCombatList[battleID].pCombatants[i].party.partyList.length > 1) {
-                activeCombatList[battleID].pCombatants[i].party.addEXP(charList,activeCombatList[battleID].pCombatants[i],texp);
-                str += '\n' + activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + "'s other party members gained " +  Math.round(texp*activeCombatList[battleID].pCombatants[i].party.expShare).toLocaleString(undefined) + " exp!\n"
-              }
-            }
-            battleMessage(str);
-          }
-
-          if(activeCombatList[battleID].pCombatants[i].zenkaiTriggered === 1 && activeCombatList[battleID].deathChance > 0) {
-            battleMessage(activeCombatList[battleID].pCombatants[i].name + " has gained a zenkai boost!");
-          }
-        }
-        pplv = pplv/activeCombatList[battleID].pCombatants.length;
-        for(let i = 0; i < activeCombatList[battleID].NPCombatants.length; i++) {
-          let xp = 1+Math.round(activeCombatList[battleID].expMod * exp * (pplv / activeCombatList[battleID].NPCombatants[i].level) / 2);
-          if(activeCombatList[battleID].NPCombatants.userID === 'NPC') xp = xp*npcEXPMulti;
-          let str = "";
-
-          if(activeCombatList[battleID].NPCombatants[i].playerID !== "NPC" && activeCombatList[battleID].NPCombatants[i].playerID !== "Random") {
-            let user = Helpers.getCharList(activeCombatList[battleID].NPCombatants[i].playerID, users);
-            let chance = Math.round(Math.random() * 100);
-            let availableTechs = new Array();
-
-            for(let j = 0; j < activeCombatList[battleID].pCombatants[i].techniques.length; j++) {
-              if(techList[activeCombatList[battleID].pCombatants[i].techniques[j]].tag !== "Common" && techList[activeCombatList[battleID].pCombatants[i].techniques[j]].tag !== "Uncommon") {  }
-              else availableTechs.push(activeCombatList[battleID].pCombatants[i].techniques[j]);
-            }
-            if(activeCombatList[battleID].pCombatants[i].transformation != -1) {
-              if(techList[activeCombatList[battleID].pCombatants[i].transformation].tag !== "Common") {  }
-              else availableTechs.push(activeCombatList[battleID].pCombatants[i].transformation);
-            }
-
-            if(activeCombatList[battleID].zeniRisk > 0) zeni += activeCombatList[battleID].zeniRisk*2;
-            if(activeCombatList[battleID].raid !== 0) zeni *= 1.25;
-            else if(activeCombatList[battleID].itemBox !== "None") zeni *= activeCombatList[battleID].expMod;
-            user.zeni = Math.round(user.zeni + zeni);
-
-            while(chance >= 60) {
-              let index = Math.floor(Math.random()*availableTechs.length);
-              cTech = availableTechs[index];
-
-              let yes = user.addTag(cTech);
-              if(yes === -1) {
-                 chance = -1;
-                 str += activeCombatList[battleID].NPCombatants[i].name.replace(/\_/g,' ') + ' managed to learn ';
-                 str += techList[cTech].name.replace(/\_/g,' ') + ' from their enemies!\n';
-              }
-              else availableTechs.splice(index,1);
-
-              if(availableTechs.length === 0) chance = -1;
-            } 
-
-            //battleMessage(output);
-            str += activeCombatList[battleID].NPCombatants[i].name.replace(/\_/g,' ') + " gains " + parseInt(zeni).toLocaleString(undefined) + ' <:zeni:833538647768694794>!\n'
-          }
-
-          /*battleMessage(activeCombatList[battleID].NPCombatants[i].name.replace(/\_/g,' ') + " gains " + xp.toLocaleString(undefined) + " EXP!");
-
-          let str = activeCombatList[battleID].NPCombatants[i].addEXP(xp);*/
-
-          //let str = "";
-          if(activeCombatList[battleID].NPCombatants[i].party === null)  {
-            //str += xp.toLocaleString(undefined)
-          }
-          else {
-            xp = Math.max(1,Math.round(xp*activeCombatList[battleID].NPCombatants[i].party.expMod));
-            if(activeCombatList[battleID].NPCombatants[i].party.partyList.length > 1) {
-              activeCombatList[battleID].NPCombatants[i].party.addEXP(charList,activeCombatList[battleID].NPCombatants[i],xp);
-              str += '\n' + activeCombatList[battleID].NPCombatants[i].name.replace(/\_/g,' ') + "'s other party members gained " +  Math.round(xp*activeCombatList[battleID].NPCombatants[i].party.expShare).toLocaleString(undefined) + " exp!\n"
-            }
-          }
-          str += activeCombatList[battleID].NPCombatants[i].name.replace(/\_/g,' ') + " gains " + xp.toLocaleString(undefined) + " EXP!";
-          str += activeCombatList[battleID].NPCombatants[i].addEXP(xp);
-          activeCombatList[battleID].NPCombatants[i].earnedEXP = xp;
-          battleMessage(str);
-
-          if(activeCombatList[battleID].NPCombatants[i].zenkaiTriggered === 1 && activeCombatList[battleID].deathChance > 0) {
-            battleMessage(activeCombatList[battleID].NPCombatants[i].name + " has gained a zenkai boost!");
-          }
-        }
-        endBattle(battleID, 0);
-      }
-      else if(npcsDead === 1) {
-        battleMessage("The challengers have defeated all defending combatants.");
-        let exp = 1;
-        let nplv = 0;
-        let zeni = 0;
-        let availableTechs = new Array();
-        for(let i = 0; i < activeCombatList[battleID].NPCombatants.length; i++) {
-          let str = "";
-          zeni += Math.round(Math.min((activeCombatList[battleID].NPCombatants[i].battleMaxAtt.stotal+1),750)*activeCombatList[battleID].NPCombatants[i].level/10);
-          exp += 1+activeCombatList[battleID].NPCombatants[i].battleMaxAtt.stotal*statEXP;
-          exp += 1+activeCombatList[battleID].NPCombatants[i].level*levelEXP;
-          nplv += activeCombatList[battleID].NPCombatants[i].level;
-
-          for(let j = 0; j < activeCombatList[battleID].NPCombatants[i].techniques.length; j++) {
-            if(techList[activeCombatList[battleID].NPCombatants[i].techniques[j]].tag !== "Common" && techList[activeCombatList[battleID].NPCombatants[i].techniques[j]].tag !== "Uncommon") {  }
-            else availableTechs.push(activeCombatList[battleID].NPCombatants[i].techniques[j]);
-          }
-          if(activeCombatList[battleID].NPCombatants[i].transformation != -1) {
-            if(techList[activeCombatList[battleID].NPCombatants[i].transformation].tag !== "Common") {  }
-            else availableTechs.push(activeCombatList[battleID].NPCombatants[i].transformation);
-          }
-          
-          /*let txp = Math.round(activeCombatList[battleID].expMod*exp*0.04+1);
-          if(activeCombatList[battleID].NPCombatants.userID === 'NPC') txp = txp*npcEXPMulti;
-
-          battleMessage(activeCombatList[battleID].NPCombatants[i].name.replace(/\_/g,' ') + " gains " + txp.toLocaleString(undefined) + " EXP!");
-          let str = activeCombatList[battleID].NPCombatants[i].addEXP(Math.round((activeCombatList[battleID].expMod*exp*0.04+1)));
-          if(str !== null) battleMessage(str);*/
-          let texp = Math.round(activeCombatList[battleID].expMod*exp*0.04+1);
-          if(activeCombatList[battleID].NPCombatants.userID === 'NPC') txp = txp*npcEXPMulti;
-
-          if(activeCombatList[battleID].NPCombatants[i].party === null)  {
-            //str += texp.toLocaleString(undefined)
-          }
-          else {
-            texp = Math.max(1,texp*activeCombatList[battleID].NPCombatants[i].party.expMod);
-            if(activeCombatList[battleID].NPCombatants[i].party !== null && activeCombatList[battleID].NPCombatants[i].party.partyList.length > 1) {
-              activeCombatList[battleID].NPCombatants[i].party.addEXP(charList,activeCombatList[battleID].NPCombatants[i],texp);
-              str += '\n' + activeCombatList[battleID].NPCombatants[i].name.replace(/\_/g,' ') + "'s other party members gained " +  Math.round(texp*activeCombatList[battleID].NPCombatants[i].party.expShare).toLocaleString(undefined) + " exp!\n"
-            }
-          }
-          str += activeCombatList[battleID].NPCombatants[i].name.replace(/\_/g,' ') + " gains " + texp.toLocaleString(undefined) + " EXP!";
-          str += activeCombatList[battleID].NPCombatants[i].addEXP(texp);
-          activeCombatList[battleID].NPCombatants[i].earnedEXP = texp;
-          battleMessage(str);
-        }
-        nplv = nplv/activeCombatList[battleID].NPCombatants.length;
-        for(let i = 0; i < activeCombatList[battleID].pCombatants.length; i++) {
-          if(activeCombatList[battleID].pCombatants[i] == null) {
-            console.log("Null, i value: " + i);
-            continue;
-          }        
-          let str = "";
-          let xp = 1+Math.round(activeCombatList[battleID].expMod * exp * (nplv / activeCombatList[battleID].pCombatants[i].level) / 2);
-          //let str = activeCombatList[battleID].pCombatants[i].addEXP(xp);
-          let user = Helpers.getCharList(activeCombatList[battleID].pCombatants[i].playerID, users);
-          let chance = Math.round(Math.random() * 100);
-
-          if(activeCombatList[battleID].zeniRisk > 0) zeni += activeCombatList[battleID].zeniRisk*2;
-          if(activeCombatList[battleID].itemBox !== "None") zeni *= activeCombatList[battleID].expMod;
-          if(user !== null) user.zeni = Math.round(user.zeni + zeni);
-
-          while(chance >= 60 && user !== null) {
-            let index = Math.floor(Math.random()*availableTechs.length);
-            cTech = availableTechs[index];
-
-            let yes = user.addTag(cTech);
-            if(yes === -1) {
-                 chance = -1;
-                 str += activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + ' managed to learn ';
-                 str += techList[cTech].name.replace(/\_/g,' ') + ' from their enemies!\n';
-            }
-            else availableTechs.splice(index,1);
-
-            if(availableTechs.length === 0) chance = -1;
-          }
-          /*output += activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + " gains " + xp.toLocaleString(undefined) + " EXP!\n " + activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + " gains " + parseInt(zeni).toLocaleString(undefined) + ' <:zeni:833538647768694794>!'
-
-          battleMessage(output);
-          if(str !== null) battleMessage(str);*/
-          str += activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + " gains " + parseInt(zeni).toLocaleString(undefined) + ' <:zeni:833538647768694794>!\n'
-          if(activeCombatList[battleID].pCombatants[i].party === null)  {
-            //str += xp.toLocaleString(undefined)
-          }
-          else {
-            xp = Math.round(xp*activeCombatList[battleID].pCombatants[i].party.expMod);
-            if(activeCombatList[battleID].pCombatants[i].party.partyList.length > 1) {
-              activeCombatList[battleID].pCombatants[i].party.addEXP(charList,activeCombatList[battleID].pCombatants[i],xp);
-              str += '\n' + activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + "'s other party members gained " +  Math.round(xp*activeCombatList[battleID].pCombatants[i].party.expShare).toLocaleString(undefined) + " exp!\n"
-            }
-          }
-          str += activeCombatList[battleID].pCombatants[i].name.replace(/\_/g,' ') + " gains " + xp.toLocaleString(undefined) + " EXP!";
-          str += activeCombatList[battleID].pCombatants[i].addEXP(xp);
-          activeCombatList[battleID].pCombatants[i].earnedEXP = xp;
-          battleMessage(str);
-
-          if(activeCombatList[battleID].pCombatants[i].zenkaiTriggered === 1 && activeCombatList[battleID].deathChance > 0) {
-            battleMessage(activeCombatList[battleID].pCombatants[i].name + " has gained a zenkai boost!");
-          }
-
-          if(user !== null && activeCombatList[battleID].itemBox !== "None") {
-            let rng = Math.random() < 0.5 ? "weapon" : "dogi";
-            let item = Helpers.makeItem(rng, activeCombatList[battleID].itemBox.toLowerCase(), itemList);
-
-            if(user.itemInventory.addItem(item) === 1) {
-              battleMessage(activeCombatList[battleID].pCombatants[i].name + " has earned an item! You have " + (user.itemInventory.maxSize - user.itemInventory.items.length) + " item slots left.");
-              printItem(item);
-              itemList.push(item);
-
-              loader.itemSaver(itemList);
-              loader.inventorySaver(invList);
-            }
-            else {
-              battleMessage(activeCombatList[battleID].pCombatants[i].name + " has earned an item, but had no room for it!");
-              printItem(item);
-            }
-          }
-        }
-        endBattle(battleID, 1);
-      }
-    }
-    else {
-      msg.channel.send("Action set.");
-    }
-  }
-
-  function endBattle(battleID, playerWin) {
-    let danger = activeCombatList[battleID].deathChance;
-    for(let i = 0; i < activeCombatList[battleID].pCombatants.length; i++) {
-      activeCombatList[battleID].pCombatants[i].isTransformed = -1
-      activeCombatList[battleID].pCombatants[i].scaled = -1;
-      activeCombatList[battleID].pCombatants[i].statusUpdate(0); 
-
-      for(let j = 0; j < activeCombatList[battleID].pCombatants[i].techCooldowns.length; j++) {
-        activeCombatList[battleID].pCombatants[i].techCooldowns[j] = 0;
-      }
-      if(activeCombatList[battleID].pCombatants[i].playerID === "NPC") {
-        let z = npcList.map(function(e) { return e.name; }).indexOf(activeCombatList[battleID].pCombatants[i].name);
-        if(z !== -1) npcList[z].addEXP(activeCombatList[battleID].pCombatants[i].earnedEXP);
-        else console.log("pCombatants: NPC save failed.")
-        npcList[z].earnedEXP = 0;
-      }
-      else if(activeCombatList[battleID].pCombatants[i].playerID !== "Random") {
-        let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(activeCombatList[battleID].pCombatants[i].playerID+activeCombatList[battleID].pCombatants[i].name);
-        if(z !== -1) {
-          charList[z].addEXP(activeCombatList[battleID].pCombatants[i].earnedEXP);
-          if(danger > 0) {
-            charList[z].zenkaiTriggered = activeCombatList[battleID].pCombatants[i].zenkaiTriggered;
-            charList[z].gainZenkai();
-          } 
-          let index = Helpers.getCharListIndex(charList[z].playerID, users);
-          if(users[index].tutorial === 1) {
-            let str = Help.tutorial(2);
-            let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Tutorial: ' + charList[z].name.replace(/\_/g,' '));
-            currEmbed.setThumbnail("https://cdn.discordapp.com/attachments/986234335051018340/988244698265161728/unknown.png")
-            currEmbed.setDescription(str);
-            msg.channel.send({ embeds: [currEmbed] });
-          }
-          if(activeCombatList[battleID].raid !== 0 && playerWin === 1) {
-            let ui = Helpers.getCharListIndex(charList[z].playerID, users);
-            let str = Raid.raidReward(activeCombatList[battleID].raid,charList[z],users[ui]);
-            if(str !== "") {
-              let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Congratulations ' + charList[z].name.replace(/\_/g,' '));
-              currEmbed.setDescription(str);
-              msg.channel.send({ embeds: [currEmbed] });
-            }
-          }
-        }
-        else console.log("pCombatants: Player save failed.")
-        charList[z].earnedEXP = 0;
-      }
-    }
-    for(let i = 0; i < activeCombatList[battleID].NPCombatants.length; i++) {
-      activeCombatList[battleID].NPCombatants[i].isTransformed = -1;
-      activeCombatList[battleID].NPCombatants[i].scaled = -1;
-      activeCombatList[battleID].NPCombatants[i].statusUpdate(0);
-
-      for(let j = 0; j < activeCombatList[battleID].NPCombatants[i].techCooldowns.length; j++) {
-        activeCombatList[battleID].NPCombatants[i].techCooldowns[j] = 0;
-      }
-      if(activeCombatList[battleID].NPCombatants[i].playerID === "NPC") {
-        let z = npcList.map(function(e) { return e.name; }).indexOf(activeCombatList[battleID].NPCombatants[i].name);
-        if(z !== -1) npcList[z].addEXP(activeCombatList[battleID].NPCombatants[i].earnedEXP);
-        else console.log("NPCombatants: NPC save failed.")
-        npcList[z].earnedEXP = 0;
-      }
-      else if(activeCombatList[battleID].NPCombatants[i].playerID !== "Random") {
-        let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(activeCombatList[battleID].NPCombatants[i].playerID+activeCombatList[battleID].NPCombatants[i].name);
-        if(z !== -1) charList[z].addEXP(activeCombatList[battleID].NPCombatants[i].earnedEXP);
-        if(z !== -1 && danger > 0) {
-            charList[z].zenkaiTriggered = activeCombatList[battleID].NPCombatants[i].zenkaiTriggered;
-            charList[z].gainZenkai();
-          } 
-        else console.log("NPCombatants: Player save failed.")
-        charList[z].earnedEXP = 0;
-      }
-    }
-    activeCombatList.splice(battleID,1);
-    loader.inventorySaver(invList);
-    loader.characterSaver(charList);
-    loader.npcSaver(npcList);
-    loader.userSaver(users);
-  }
-
-function battleMessage(text) {
-  let currEmbed = new Discord.EmbedBuilder(messageEmbed);
-  currEmbed.setDescription(text);
-  msg.channel.send({ embeds: [currEmbed] });
-}
-
 function userTechPrint(user) {
     msg.channel.send('<@'+user.userID+'>');
     let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle('Unlocked Techniques');
@@ -6571,935 +6219,6 @@ function charTechPrint(char) {
 
     msg.channel.send({ embeds: [currEmbed] });
 }
-
-function printBattleList(battle,battleEnd) {
-  for(let i = 0; i < battle.NPCombatants.length; i++) {
-    if(battle.NPCombatants[i].playerID === 'NPC' || battle.NPCombatants[i].playerID === 'Random') {
-      battlePrint(-1,battle.NPCombatants[i],i,battleEnd);
-    }
-    else {
-      let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(battle.NPCombatants[i].playerID+battle.NPCombatants[i].name);
-      //let z = charList.indexOf(battle.NPCombatants[i])
-      battlePrint(1,z,i,battleEnd);
-    }
-  }
-  for(let i = 0; i < battle.pCombatants.length; i++) {
-    if(battle.pCombatants[i].playerID === 'NPC' || battle.pCombatants[i].playerID === 'Random') {
-      battlePrint(-1,battle.pCombatants[i],i,battleEnd);
-    }
-    else {
-      let z = charList.map(function(e) { return e.playerID+e.name; }).indexOf(battle.pCombatants[i].playerID+battle.pCombatants[i].name);
-      //let z = charList.indexOf(battle.pCombatants[i])
-      battlePrint(1,z,i,battleEnd);
-    }
-  }
-}
-
-function playerEmbed(ID,placement,battleEnd, team) {
-
-  index = ID;
-  let bcheck = Helpers.getCurrentBattle(charList[index].playerID, charList[index].name);
-  let char;
-  let combatList = new Array();
-  const selectTarget = new SelectMenuBuilder();
-  selectTarget.setCustomId('target');
-  selectTarget.setPlaceholder('Select Target');
-
-  for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-      combatList.push(activeCombatList[bcheck].pCombatants[i]);
-      if(activeCombatList[bcheck].raid !== 0 && team === 0) {
-        selectTarget.addOptions([
-          {
-            label: "Ally",
-            value: 'a' + i.toLocaleString(),
-            description: activeCombatList[bcheck].pCombatants[i].name.replace(/\_/g,' '),
-          },
-        ]);
-      }
-      else if(activeCombatList[bcheck].raid !== 0 && team === 1) {
-        selectTarget.addOptions([
-          {
-            label: "Enemy",
-            value: 'e' + i.toLocaleString(),
-            description: activeCombatList[bcheck].pCombatants[i].name.replace(/\_/g,' '),
-          },
-        ]);
-      }
-  }
-  for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-    combatList.push(activeCombatList[bcheck].NPCombatants[i]);
-      if(activeCombatList[bcheck].raid !== 0 && team === 0) {
-        selectTarget.addOptions([
-          {
-            label: "Enemy",
-            value: 'e' + i.toLocaleString(),
-            description: activeCombatList[bcheck].NPCombatants[i].name.replace(/\_/g,' '),
-          },
-        ]);
-      }
-      else if(activeCombatList[bcheck].raid !== 0 && team === 1) {
-        selectTarget.addOptions([
-          {
-            label: "Ally",
-            value: 'a' + i.toLocaleString(),
-            description: activeCombatList[bcheck].NPCombatants[i].name.replace(/\_/g,' '),
-          },
-        ]);
-      }
-  }
-  for(let i = 0; i < combatList.length; i++) {
-    if(combatList[i].name === charList[index].name) {
-      char = combatList[i];
-      break;
-    }
-  }
-
-  let name = char.name.replace(/\_/g,' ');
-  if(char.isTransformed !== -1) {
-    if(techList[char.transformation].name == "Potential_Unleashed" || techList[char.transformation].name.search("Saiyan") !== -1) {
-      name = techList[char.transformation].name.replace(/\_/g,' ') + ' ' + char.name.replace(/\_/g,' ');
-    }
-    else name += ', ' + techList[char.transformation].name.replace(/\_/g,' ');
-  }
-
-  let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(name);
-  if(char.image === '' || char.image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
-  else { currEmbed.setThumbnail(char.image); }
-
-  let hpPercent = Math.round((char.battleCurrAtt.health/char.battleMaxAtt.health)*5);
-  let energyPercent = Math.round((char.battleCurrAtt.energy/char.battleMaxAtt.energy)*5);
-  let chargePercent = Math.round((char.battleCurrAtt.charge/char.battleMaxAtt.charge)*5);
-  let hpStr = "";
-  let engStr = "";
-  let chargeStr = "";
-  for(let i = 0; i < 5; i++) {
-    if(i < hpPercent) {
-      hpStr += "🟥";
-    }
-    else {
-      hpStr += "⬛";
-    }
-    if(i < energyPercent) {
-      engStr += "🟦";
-    }
-    else {
-      engStr += "⬛";
-    }
-    if(i < chargePercent) {
-      chargeStr += "🟨";
-    }
-    else {
-      chargeStr += "⬛";
-    }
-  }
-  hpStr += '\n' + char.battleCurrAtt.health.toLocaleString(undefined) + '/' + char.battleMaxAtt.health.toLocaleString(undefined);
-  engStr += '\n' + char.battleCurrAtt.energy.toLocaleString(undefined) + '/' + char.battleMaxAtt.energy.toLocaleString(undefined);
-  chargeStr += '\n' + char.battleCurrAtt.charge.toLocaleString(undefined) + '/' + char.battleMaxAtt.charge.toLocaleString(undefined);
-  currEmbed.addFields(
-    { name: 'Race', value: char.race.raceName.replace(/\_/g,' ').toLocaleString(), inline:true },
-    //{ name: 'Level', value: char.level.toLocaleString(), inline: true  },
-    //{ name: 'Attribute Total', value: char.battleCurrAtt.stotal.toLocaleString(), inline: true  },
-    { name: 'Power Level', value: char.battleCurrAtt.scanPowerLevel(char.battleCurrAtt.charge,char.level).toLocaleString(undefined), inline: true },
-    //{ name: '\u200b', value: '\u200b', inline: true  },
-    { name: 'Team ' + (team+1).toLocaleString(), value: 'Slot ' + placement.toLocaleString(), inline: true  },
-
-    { name: ':red_circle: Health', value: hpStr, inline: true },
-    //{ name: '\u200b', value: '\u200b', inline: true  },
-    { name: ':blue_circle: Energy', value: engStr, inline: true },
-    { name: ':yellow_circle: Charge', value: chargeStr, inline: true },
-  );
-
-  if(activeCombatList[bcheck].raid === 0) {
-    let dogiN = "None";
-    let weaponN = "None";
-    if(char.dogi !== null) dogiN = char.dogi.name.replace(/\_/g,' ');
-    if(char.weapon !== null) weaponN = char.weapon.name.replace(/\_/g,' ');
-    currEmbed.addFields(
-      { name: 'Dogi', value: dogiN, inline: true  },
-      { name: 'Weapon', value: weaponN, inline: true  },
-        { name: 'Fighting Style', value: char.styleName.replace(/\_/g,' '), inline: true  }
-    );
-  }
-
-  let scaleLvl = Math.round((char.battleCurrAtt.stotal + char.level)/2);
-  const row1 = new ActionRowBuilder();
-  const row2 = new ActionRowBuilder();
-  const select = new SelectMenuBuilder();
-  select.setCustomId('techs');
-  select.setPlaceholder('Select Technique');
-  row2.addComponents(
-    new ButtonBuilder()
-      .setCustomId('strike')
-      .setLabel('Strike')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('burst')
-      .setLabel('Burst')
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId('charge')
-      .setLabel('Charge')
-      .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('techcharge')
-      .setLabel('Toggle Charge')
-      .setStyle(ButtonStyle.Danger),
-  );
-  let str;
-  let cstr = "";
-
-  if(char.techniques.length >= 1 && battleEnd !== 1) {
-      for(let i = 0; i < char.techniques.length; i++) {
-        if(techList[char.techniques[i]].energyCost > 0) str = (techList[char.techniques[i]].energyCost*scaleLvl).toLocaleString(undefined) + 'EP|\n';
-        if(techList[char.techniques[i]].healthCost > 0) str += (techList[char.techniques[i]].healthCost*scaleLvl).toLocaleString(undefined) + 'HP|\n';
-         + '| \n';
-        if(techList[char.techniques[i]].scalePercent !== 0 && techList[char.techniques[i]].flatDamage !== 0 &&
-          techList[char.techniques[i]].techType !== "Transform") {
-          str += (techList[char.techniques[i]].scalePercent*100).toLocaleString(undefined) + '%+';
-          str += (techList[char.techniques[i]].flatDamage).toLocaleString(undefined);
-          if( techList[char.techniques[i]].hits > 0) str += ' x' + (techList[char.techniques[i]].hits).toLocaleString(undefined);
-          if(techList[char.techniques[i]].techType === "Restoration" && techList[char.techniques[i]].health > 0) str += ' healing|\n'
-          else if(techList[char.techniques[i]].techType === "Restoration" && techList[char.techniques[i]].energy > 0) str += ' energy restore|\n'
-          else str += ' damage| \n'
-        }
-
-        if(techList[char.techniques[i]].techType === "Buff") {
-          if(techList[char.techniques[i]].guardTarget > 0) {
-            cstr = " [Guard] | " + techList[char.techniques[i]].duration + " turn duration";
-          }
-          else {
-            cstr = " | " + techList[char.techniques[i]].duration + " turn duration";
-          }
-        } 
-        else if(techList[char.techniques[i]].allowCharge !== 0) {
-          cstr = " [Charge] ";
-        } 
-        else {
-          cstr = "";
-        }
-
-        if(techList[char.techniques[i]].armorPen !== 0) str += (techList[char.techniques[i]].armorPen).toLocaleString(undefined) + '% pen|\n';
-        if(techList[char.techniques[i]].critRate !== 0) str += (techList[char.techniques[i]].critRate).toLocaleString(undefined) + '% crit|\n';
-
-        if(char.techCooldowns[i] > 0) cstr += ' - ' + char.techCooldowns[i] + ' turn CD';
-        else cstr += ' - Ready';
-        //currEmbed.addField(':one: ' + techList[char.techniques[0]].name.replace(/\_/g,' '), str, true);
-        let emoja;
-
-        if(char.techCooldowns[i] > 0) {
-          emoja = '⬛';
-        }
-        else if(techList[char.techniques[i]].techType === "Restoration") {
-          emoja = '🟩';
-        }
-        else if(techList[char.techniques[i]].techType === "Ki") {
-          emoja = '🟦';
-        }
-        else if(techList[char.techniques[i]].techType === "Strike") {
-          emoja = '🟧';
-        }
-        else if(techList[char.techniques[i]].techType === "Buff") {
-          emoja = '⬜';
-        }
-        else if(techList[char.techniques[i]].techType === "Debuff") {
-          emoja = '🟪';
-        }
-
-        select.addOptions([
-          {
-            label: techList[char.techniques[i]].name.replace(/\_/g,' ') + cstr,
-            value: i.toLocaleString(),
-            description: str,
-            emoji: emoja
-          },
-        ]);
-    }
-  }
-  if(char.transformation !== -1 && battleEnd !== 1) {
-    if(techList[char.transformation].energyCost > 0) str = Math.round(techList[char.transformation].energyCost/100*char.battleMaxAtt.energy).toLocaleString(undefined) + ' EN per round \n';
-    if(techList[char.transformation].healthCost > 0) str += Math.round(techList[char.transformation].healthCost/100*char.battleMaxAtt.health).toLocaleString(undefined) + ' HP per round \n';
-    //currEmbed.addField('<:t_red:832763572919992390> ' + techList[char.transformation].name.replace(/\_/g,' '), str, true);
-      select.addOptions([
-        {
-          label: techList[char.transformation].name.replace(/\_/g,' '),
-          value: char.transformation.toLocaleString(undefined),
-          description: str,
-          emoji:'<:t_red:832763572919992390>',
-        },
-      ]);
-  }
-
-  //msg.channel.send({ embeds: [currEmbed] });
-  let row3 = null;
-  if(activeCombatList[bcheck].raid === 0) {
-    row1.addComponents(select);
-  }
-  else {
-    row1.addComponents(select);
-    row3 = new ActionRowBuilder();
-    row3.addComponents(selectTarget);
-  }
-  return [currEmbed, row1, row2, row3]
-}
-
-/********************
-  battlePrint : Prints the stats of a combatant in a battle
-      - pcOrNPC   : Given a value between 0, 1 and -1 which will print assuming the ID is a reference for an NPC, a player or that it's a character object respectively
-      - ID        : This ID is either a reference to npcList/charList or a character object which will be used to print the relevant stats
-      - Placement : The placement in the battle's character list. This is for displaying to people for targetting with skills
-********************/
-function battlePrint(pcOrNPC, ID, placement, battleEnd) {
-  if(battleEnd !== 1) battleEnd = -1;
-
-  if(pcOrNPC === 1) {
-    let team = -5;
-    let bcheck = Helpers.getCurrentBattle(charList[ID].playerID, charList[ID].name);
-    let char;
-    let combatList = new Array();
-    for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-        combatList.push(activeCombatList[bcheck].pCombatants[i]);
-    }
-    for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-      combatList.push(activeCombatList[bcheck].NPCombatants[i]);
-    }
-    for(let i = 0; i < combatList.length; i++) {
-      if(combatList[i].name === charList[ID].name) {
-        char = combatList[i];
-        break;
-      }
-    }
-    let charName = char.name;
-
-    let combatI = activeCombatList[bcheck].pCombatants.map(function(e) { return e.playerID; }).indexOf(charList[ID].playerID);
-    if(combatI === -1) {
-      combatI = activeCombatList[bcheck].NPCombatants.map(function(e) { return e.playerID; }).indexOf(charList[ID].playerID);
-      team = 1; //NPC team
-    }
-    else team = 0; //player team
-    let embed = playerEmbed(ID,placement,battleEnd, team);
-    let components = new Array();
-    components.push(embed[1]);
-    if(embed[3] !== null) components.push(embed[3]);
-    //if(embed[4] !== null) components.push(embed[4]);
-    components.push(embed[2]);
-
-    if(team === 0 && activeCombatList[bcheck].pCombatants[combatI].battleCurrAtt.health <= 0) {
-      components = new Array()
-      let newRow = new ActionRowBuilder;
-      newRow.addComponents(
-        new ButtonBuilder()
-          .setCustomId('wait')
-          .setLabel('Wait')
-          .setStyle(ButtonStyle.Danger)
-          );
-      components.push(newRow);
-    }
-
-    if(battleEnd === 1) msg.channel.send({ embeds: [embed[0]], components: []});
-    else msg.channel.send({ embeds: [embed[0]], components: components})
-      .then(message => {
-        const filter = (i) => {
-            let z = Helpers.findID(i.user.id, charList, users)
-            if(i.user.id === char.playerID && message.id === i.message.id) {
-              bcheck = Helpers.getCurrentBattle(charList[z].playerID, charList[z].name);
-              return true;
-            }
-            else return false;
-        };
-
-    const collector = msg.channel.createMessageComponentCollector({ filter, time: 1000*60*60*24, max: 1 });
-    collector.on('collect', async i => { 
-      ID = Helpers.findID(i.user.id, charList, users)
-      if(bcheck === -1) {
-        collector.stop();
-        i.update({ embeds: [embed[0]], components: [] });
-        return;
-      }
-      else if(i.customId === 'wait') {
-        let index = -1;
-        for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-            index = i;
-            break;
-          }
-        }
-
-        let action = activeCombatList[bcheck].wait();
-        action.push(index);
-        action.push(-1);
-        activeCombatList[bcheck].actions.push(action);
-
-        collector.stop();
-        i.update({ embeds: [embed[0]], components: [] });
-        battleTurn(bcheck);
-      }
-      else if(i.customId === 'target') {
-        let index = -1;
-        for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-            index = i;
-            break;
-          }
-        }
-        if(index === -1) {
-            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-        }
-
-        message.delete();
-        battlePrint(pcOrNPC, ID, placement, battleEnd);
-        if(i.values[0].charAt(0) === "a") {
-          if(team === 0) activeCombatList[bcheck].pCombatants[index].aTarget = i.values[0].charAt(1);
-          else activeCombatList[bcheck].NPCombatants[index].aTarget = i.values[0].charAt(1);
-          msg.channel.send("Ally Target set to " + i.values[0].charAt(1) + ".");
-        }
-        else {
-          if(team === 0) activeCombatList[bcheck].pCombatants[index].eTarget = i.values[0].charAt(1);
-          else activeCombatList[bcheck].NPCombatants[index].eTarget = i.values[0].charAt(1);
-          msg.channel.send("Enemy Target set to " + i.values[0].charAt(1) + ".");
-        }
-      }
-      else if(i.customId === 'techcharge') {
-        let index = 0;
-        if(team === 0) {
-          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          if(activeCombatList[bcheck].pCombatants[index].isCharging === 1) {
-            activeCombatList[bcheck].pCombatants[index].isCharging = 0;
-            message.delete();
-            battlePrint(pcOrNPC, ID, placement, battleEnd);
-            msg.channel.send("No longer using charge to empower techniques.");
-          }
-          else {
-            activeCombatList[bcheck].pCombatants[index].isCharging = 1;
-            message.delete();
-            battlePrint(pcOrNPC, ID, placement, battleEnd);
-            msg.channel.send("Now using charge to empower techniques.");
-          }
-          return;
-        }
-        else {
-          let index = 0;
-          for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          if(activeCombatList[bcheck].NPCombatants[index].isCharging === 1) {
-            activeCombatList[bcheck].NPCombatants[index].isCharging = 0;
-            message.delete();
-            battlePrint(pcOrNPC, ID, placement, battleEnd);
-            msg.channel.send("No longer using charge to empower techniques.");
-          }
-          else {
-            activeCombatList[bcheck].NPCombatants[index].isCharging = 1;
-            message.delete();
-            battlePrint(pcOrNPC, ID, placement, battleEnd);
-            msg.channel.send("Now using charge to empower techniques.");
-          }
-          return;
-        }
-      }
-      else if(i.customId === 'techs') {
-        if(team === 1) {
-          if(techList[i.values[0]].techType === "Transform") {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            let action = activeCombatList[bcheck].transform(activeCombatList[bcheck].NPCombatants[index]);
-            action.push(index);
-            action.push(-1);
-            activeCombatList[bcheck].NPCactions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-          else {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-
-            let techID = activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]];
-            if((techList[techID].techType === "Strike" || techList[techID].techType === "Ki") &&
-              techList[techID].transReq !== "None" && (activeCombatList[bcheck].NPCombatants[index].transformation === -1 
-              || techList[activeCombatList[bcheck].NPCombatants[index].transformation].name.search(techList[techID].transReq) === -1))
-            { 
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("Required transformation not set.");
-              return;
-            }
-
-            if((techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki"
-              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
-              && (activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) 
-                || activeCombatList[bcheck].NPCombatants[index].eTarget < 0)) {
-                  activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
-            }
-            else if(activeCombatList[bcheck].NPCombatants[index].aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].aTarget < 0) {
-                activeCombatList[bcheck].NPCombatants[index].aTarget = 0;
-            }
-
-            if((techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki"
-              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
-              && activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-              let npchar = activeCombatList[bcheck].NPCombatants[index];
-              while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-                if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-                else npchar.eTarget++;
-              }
-            }
-            else if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.health <= 0) {
-              let npchar = activeCombatList[bcheck].NPCombatants[index];
-              while((npchar.aTarget < 0 || npchar.aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.aTarget].battleCurrAtt.health <= 0)) {
-                if(npchar.aTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.aTarget < 0) npchar.aTarget = 0;
-                else npchar.aTarget++;
-              }
-            }
-
-            if(activeCombatList[bcheck].NPCombatants[index].techCooldowns[i.values[0]] != 0) {
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("Skill on cooldown.");
-              return;
-            }
-
-
-            if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.charge <= 0) activeCombatList[bcheck].NPCombatants[index].isCharging = 0;
-
-            let costMod = Math.round((activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.stotal + activeCombatList[bcheck].NPCombatants[index].level)/2);
-            if(activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.health <= techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].healthCost*costMod ||
-               activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.energy < techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].energyCost*costMod ||
-               activeCombatList[bcheck].NPCombatants[index].battleCurrAtt.charge 
-               < Math.round(activeCombatList[bcheck].NPCombatants[index].battleMaxAtt.charge * 0.2 * activeCombatList[bcheck].NPCombatants[index].isCharging * techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].allowCharge)) {
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("You don't have the resources for this technique.");
-              return;
-            }
-
-            activeCombatList[bcheck].NPCombatants[index].techCooldowns[i.values[0]] = techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].coolDown;
-            let target;
-            let targetI;
-            if(techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Ki" 
-              || techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]].techType === "Debuff") {
-              targetI = activeCombatList[bcheck].NPCombatants[index].eTarget;
-              target = activeCombatList[bcheck].pCombatants[targetI];
-            }
-            else {
-              targetI = activeCombatList[bcheck].NPCombatants[index].aTarget;
-              target = activeCombatList[bcheck].pCombatants[targetI];
-            }
-
-            let action = activeCombatList[bcheck].skill(activeCombatList[bcheck].NPCombatants[index],target,techList[activeCombatList[bcheck].NPCombatants[index].techniques[i.values[0]]], activeCombatList[bcheck].NPCombatants[index].isCharging);
-            action.push(index);
-            action.push(targetI);
-            activeCombatList[bcheck].NPCactions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-        }
-        else {
-          if(techList[i.values[0]].techType === "Transform") {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-            let action = activeCombatList[bcheck].transform(activeCombatList[bcheck].pCombatants[index]);
-            action.push(index);
-            action.push(-1);
-            activeCombatList[bcheck].actions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-          else {
-            let index = 0;
-            for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-                index = i;
-                break;
-              }
-            }
-
-            let techID = activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]];
-            if((techList[techID].techType === "Strike" || techList[techID].techType === "Ki") &&
-              techList[techID].transReq !== "None" && (activeCombatList[bcheck].pCombatants[index].transformation === -1 
-              || techList[activeCombatList[bcheck].pCombatants[index].transformation].name.search(techList[techID].transReq) === -1))
-            { 
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("Required transformation not set.");
-              return;
-            }
-
-
-            if((techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki"
-              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
-              && (activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) 
-                || activeCombatList[bcheck].pCombatants[index].eTarget < 0)) {
-              activeCombatList[bcheck].pCombatants[index].eTarget = 0;
-            }
-            else if(activeCombatList[bcheck].pCombatants[index].aTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].aTarget < 0) {
-              activeCombatList[bcheck].pCombatants[index].aTarget = 0;
-            }
-
-            if((techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki"
-              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") 
-              && activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-              let npchar = activeCombatList[bcheck].pCombatants[index];
-              while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-                if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-                else npchar.eTarget++;
-              }
-            }
-            else if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.health <= 0) {
-              let npchar = activeCombatList[bcheck].pCombatants[index];
-              while((npchar.aTarget < 0 || npchar.aTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.aTarget].battleCurrAtt.health <= 0)) {
-                if(npchar.aTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.aTarget < 0) npchar.aTarget = 0;
-                else npchar.aTarget++;
-              }
-            }
-
-            if(activeCombatList[bcheck].pCombatants[index].techCooldowns[i.values[0]] != 0) {
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("Skill on cooldown.");
-              return;
-            }
-
-
-            if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.charge <= 0) activeCombatList[bcheck].pCombatants[index].isCharging = 0;
-
-            let costMod = Math.round((activeCombatList[bcheck].pCombatants[index].battleCurrAtt.stotal + activeCombatList[bcheck].pCombatants[index].level)/2);
-            if(activeCombatList[bcheck].pCombatants[index].battleCurrAtt.health <= techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].healthCost*costMod ||
-               activeCombatList[bcheck].pCombatants[index].battleCurrAtt.energy < techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].energyCost*costMod ||
-               activeCombatList[bcheck].pCombatants[index].battleCurrAtt.charge 
-               < Math.round(activeCombatList[bcheck].pCombatants[index].battleMaxAtt.charge * 0.2 * activeCombatList[bcheck].pCombatants[index].isCharging * techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].allowCharge)) {
-              message.delete();
-              battlePrint(pcOrNPC, ID, placement, battleEnd);
-              msg.channel.send("You don't have the resources for this technique.");
-              return;
-            }
-
-            activeCombatList[bcheck].pCombatants[index].techCooldowns[i.values[0]] = techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].coolDown;
-            let target;
-            let targetI;
-            if(techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Strike" 
-              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Ki" 
-              || techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]].techType === "Debuff") {
-              targetI = activeCombatList[bcheck].pCombatants[index].eTarget;
-              target = activeCombatList[bcheck].NPCombatants[targetI];
-            }
-            else {
-              targetI = activeCombatList[bcheck].pCombatants[index].aTarget;
-              target = activeCombatList[bcheck].pCombatants[targetI];
-            }
-
-            let action = activeCombatList[bcheck].skill(activeCombatList[bcheck].pCombatants[index],target,techList[activeCombatList[bcheck].pCombatants[index].techniques[i.values[0]]], activeCombatList[bcheck].pCombatants[index].isCharging);
-            action.push(index);
-            action.push(targetI);
-            activeCombatList[bcheck].actions.push(action);
-
-            collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-          }
-        }
-      }
-      else if(i.customId === 'strike') {
-        if(team === 1) {
-          let index = 0;
-          for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          if(activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].eTarget < 0) {
-              activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
-          }
-          if(activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-            let npchar = activeCombatList[bcheck].NPCombatants[index];
-            while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-              if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-              else npchar.eTarget++;
-            }
-          }
-
-          let action = activeCombatList[bcheck].strike(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck].pCombatants[charList[ID].eTarget]);
-          action.push(index);
-          action.push(activeCombatList[bcheck].NPCombatants[index].eTarget);
-          activeCombatList[bcheck].NPCactions.push(action);
-
-          collector.stop();
-            try {
-              i.update({ embeds: [embed[0]], components: [] })
-                      .then(battleTurn(bcheck));
-            } catch (error) { console.error(error); }
-        }
-        else {
-          let index = 0;
-          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          if(activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].eTarget < 0) {
-              activeCombatList[bcheck].pCombatants[index].eTarget = 0;
-          }
-          if(activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-            let npchar = activeCombatList[bcheck].pCombatants[index];
-            while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-              if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-              else npchar.eTarget++;
-            }
-          }
-
-          let action = activeCombatList[bcheck].strike(activeCombatList[bcheck].pCombatants[index],activeCombatList[bcheck].NPCombatants[char.eTarget]);
-          action.push(index);
-          action.push(activeCombatList[bcheck].pCombatants[index].eTarget);
-          activeCombatList[bcheck].actions.push(action);
-
-          collector.stop();
-          try {
-            i.update({ embeds: [embed[0]], components: [] })
-                    .then(battleTurn(bcheck));
-          } catch (error) { console.error(error); }
-        }
-      }
-      else if(i.customId === 'burst') {
-        if(team === 1) {
-          let index = 0;
-          for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          if(activeCombatList[bcheck].NPCombatants[index].eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].NPCombatants[index].eTarget < 0) {
-              activeCombatList[bcheck].NPCombatants[index].eTarget = 0;
-          }
-          if(activeCombatList[bcheck].pCombatants[activeCombatList[bcheck].NPCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-            let npchar = activeCombatList[bcheck].NPCombatants[index];
-            while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || activeCombatList[bcheck].pCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-              if(npchar.eTarget > (activeCombatList[bcheck].pCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-              else npchar.eTarget++;
-            }
-          }
-
-          let action = activeCombatList[bcheck].burst(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck].pCombatants[char.eTarget]);
-          action.push(index);
-          action.push(activeCombatList[bcheck].NPCombatants[index].eTarget);
-          activeCombatList[bcheck].NPCactions.push(action);
-
-          collector.stop();
-          try {
-            i.update({ embeds: [embed[0]], components: [] })
-                    .then(battleTurn(bcheck));
-          } catch (error) { console.error(error); }
-        }
-        else {
-          let index = 0;
-          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          if(activeCombatList[bcheck].pCombatants[index].eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].pCombatants[index].eTarget < 0) {
-              activeCombatList[bcheck].pCombatants[index].eTarget = 0;
-          }
-          if(activeCombatList[bcheck].NPCombatants[activeCombatList[bcheck].pCombatants[index].eTarget].battleCurrAtt.health <= 0) {
-            let npchar = activeCombatList[bcheck].pCombatants[index];
-            while((npchar.eTarget < 0 || npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || activeCombatList[bcheck].NPCombatants[npchar.eTarget].battleCurrAtt.health <= 0)) {
-              if(npchar.eTarget > (activeCombatList[bcheck].NPCombatants.length-1) || npchar.eTarget < 0) npchar.eTarget = 0;
-              else npchar.eTarget++;
-            }
-          }
-
-          let action = activeCombatList[bcheck].burst(activeCombatList[bcheck].pCombatants[index],activeCombatList[bcheck].NPCombatants[charList[ID].eTarget]);
-          action.push(index);
-          action.push(activeCombatList[bcheck].pCombatants[index].eTarget);
-          activeCombatList[bcheck].actions.push(action);
-
-          collector.stop();
-          try {
-            i.update({ embeds: [embed[0]], components: [] })
-                    .then(battleTurn(bcheck));
-          } catch (error) { console.error(error); }
-        }
-      }
-      else if(i.customId === 'charge') {
-        if(team === 1) {
-          let index = 0;
-          for(let i = 0; i < activeCombatList[bcheck].NPCombatants.length; i++) {
-              if(activeCombatList[bcheck].NPCombatants[i].playerID+activeCombatList[bcheck].NPCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          let action = activeCombatList[bcheck].charge(activeCombatList[bcheck].NPCombatants[index],activeCombatList[bcheck]);
-          action.push(index);
-          action.push(-1);
-          activeCombatList[bcheck].NPCactions.push(action);
-
-          collector.stop();
-          try {
-            i.update({ embeds: [embed[0]], components: [] })
-                    .then(battleTurn(bcheck));
-          } catch (error) { console.error(error); }
-        }
-        else {
-          let index = 0;
-          for(let i = 0; i < activeCombatList[bcheck].pCombatants.length; i++) {
-              if(activeCombatList[bcheck].pCombatants[i].playerID+activeCombatList[bcheck].pCombatants[i].name === char.playerID+char.name) {
-              index = i;
-              break;
-            }
-          }
-          let action = activeCombatList[bcheck].charge(activeCombatList[bcheck].pCombatants[index]);
-          action.push(index);
-          action.push(-1);
-          activeCombatList[bcheck].actions.push(action);
-
-          collector.stop();
-          try {
-            i.update({ embeds: [embed[0]], components: [] })
-                    .then(battleTurn(bcheck));
-          } catch (error) { console.error(error); }
-        }
-      }
-    });
-    collector.on('end', collected => { })
-    });
-  }
-  else {
-    let char = ID;
-    let name = char.name.replace(/\_/g,' ');
-    if(char.isTransformed !== -1) {
-        if(techList[char.transformation].name == "Potential_Unleashed" || techList[char.transformation].name.search("Saiyan") !== -1) {
-          name = techList[char.transformation].name.replace(/\_/g,' ') + ' ' + char.name.replace(/\_/g,' ');
-        }
-        else name += ', ' + techList[char.transformation].name.replace(/\_/g,' ');
-    }
-
-    let currEmbed = new Discord.EmbedBuilder(statusEmbed).setTitle(name);
-    if(char.image === '' || char.image === null) { currEmbed.setThumbnail(msg.author.avatarURL()); }
-    else { currEmbed.setThumbnail(char.image); }
-
-    let team = -5;
-    let bcheck = Helpers.getCurrentBattle(char.playerID, char.name);
-    let combatI = activeCombatList[bcheck].pCombatants.map(function(e) { return e.playerID+e.name; }).indexOf(char.playerID+char.name);
-    if(combatI === -1) {
-      team = 2; //NPC team
-    }
-    else team = 1; //player team
-
-    if(team == 2 && activeCombatList[bcheck].raid !== 0) {
-      currEmbed.setFooter({ text: "Focusing on " + activeCombatList[bcheck].pCombatants[char.threatlist[0][0]].name.replace(/\_/g,' ') });
-    }
-    else if(activeCombatList[bcheck].raid !== 0) {
-      currEmbed.setFooter({ text: "Focusing on " + activeCombatList[bcheck].NPCombatants[char.threatlist[0][0]].name.replace(/\_/g,' ') });
-    }
-
-    let hpPercent = Math.round((char.battleCurrAtt.health/char.battleMaxAtt.health)*5);
-    let energyPercent = Math.round((char.battleCurrAtt.energy/char.battleMaxAtt.energy)*5);
-    let chargePercent = Math.round((char.battleCurrAtt.charge/char.battleMaxAtt.charge)*5);
-    let hpStr = "";
-    let engStr = "";
-    let chargeStr = "";
-    for(let i = 0; i < 5; i++) {
-      if(i < hpPercent) {
-        hpStr += "🟥";
-      }
-      else {
-        hpStr += "⬛";
-      }
-      if(i < energyPercent) {
-        engStr += "🟦";
-      }
-      else {
-        engStr += "⬛";
-      }
-      if(i < chargePercent) {
-        chargeStr += "🟨";
-      }
-      else {
-        chargeStr += "⬛";
-      }
-    }
-    hpStr += '\n' + char.battleCurrAtt.health.toLocaleString(undefined) + '/' + char.battleMaxAtt.health.toLocaleString(undefined);
-    engStr += '\n' + char.battleCurrAtt.energy.toLocaleString(undefined) + '/' + char.battleMaxAtt.energy.toLocaleString(undefined);
-    chargeStr += '\n' + char.battleCurrAtt.charge.toLocaleString(undefined) + '/' + char.battleMaxAtt.charge.toLocaleString(undefined);
-    currEmbed.addFields(
-      { name: 'Race', value: char.race.raceName.replace(/\_/g,' ').toLocaleString(), inline:true },
-      //{ name: 'Level', value: char.level.toLocaleString(), inline: true  },
-      //{ name: 'Attribute Total', value: char.battleCurrAtt.stotal.toLocaleString(), inline: true  },
-      { name: 'Power Level', value: char.battleCurrAtt.scanPowerLevel(char.battleCurrAtt.charge,char.level).toLocaleString(undefined), inline: true },
-      //{ name: '\u200b', value: '\u200b', inline: true  },
-      { name: 'Team ' + team.toLocaleString(), value: 'Slot ' + placement.toLocaleString(), inline: true },
-
-      { name: ':red_circle: Health', value: hpStr, inline: true },
-      //{ name: '\u200b', value: '\u200b', inline: true  },
-      { name: ':blue_circle: Energy', value: engStr, inline: true },
-      { name: ':yellow_circle: Charge', value: chargeStr, inline: true },
-    );
-
-    if(activeCombatList[bcheck].raid === 0) {
-      let dogiN = "None";
-      let weaponN = "None";
-      if(char.dogi !== null) dogiN = char.dogi.name.replace(/\_/g,' ');
-      if(char.weapon !== null) weaponN = char.weapon.name.replace(/\_/g,' ');
-      currEmbed.addFields(
-        { name: 'Dogi', value: dogiN, inline: true  },
-        { name: 'Weapon', value: weaponN, inline: true  },
-        { name: 'Fighting Style', value: char.styleName.replace(/\_/g,' '), inline: true }
-      );
-    }
-
-    msg.channel.send({ embeds: [currEmbed] });
-  }
-}
-
 
 function startTraining(char, player) {
   if(char.trainingType === 'xp') {

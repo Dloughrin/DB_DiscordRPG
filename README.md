@@ -62,5 +62,5 @@ The main entry point for the bot. Coordinates loading data, handling commands an
 ### helpers
 Miscellaneous utilities used by the bot live under **helpers/**:
 * **helpers.js** - Common helper functions and item generators.
-* **battleMaster.js** - Skeleton for UI-driven combat flow (work in progress).
+* **battleMaster.js** - Handles combat UI and flow separate from the main bot logic.
 * **deploy-commands.js** - Registers slash commands with Discord.
